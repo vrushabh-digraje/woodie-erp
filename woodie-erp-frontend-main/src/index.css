@@ -1,0 +1,269 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap");
+@import "tailwindcss";
+
+@theme {
+  /* Woodie brand — from logo */
+  --color-brand-navy: #1a2a4a;
+  --color-brand-matte-black: #121212;
+  --color-brand-dark-gray: #2d2d2d;
+  --color-brand-amber: #e8a020;
+  --color-brand-blue: #2a4a7a;
+  --color-brand-amber-dark: #c07010;
+  --color-brand-amber-hover: #d4921a;
+  --color-brand-navy-light: #243a5c;
+
+  /* Legacy aliases (map to new brand) */
+  --color-brand-primary: #e8a020;
+  --color-brand-primary-hover: #d4921a;
+  --color-brand-primary-muted: #c07010;
+  --color-brand-primary-light: rgba(232, 160, 32, 0.12);
+  --color-text-on-brand: #1a2a4a;
+
+  --color-ui-primary: #2a4a7a;
+  --color-ui-primary-hover: #243a5c;
+  --color-ui-primary-muted: #5a7aaa;
+  --color-ui-primary-light: rgba(42, 74, 122, 0.12);
+
+  --color-site-green: #10b981;
+  --color-site-green-light: #ecfdf5;
+  --color-site-pill: rgba(232, 160, 32, 0.12);
+  --color-site-pill-hover: rgba(232, 160, 32, 0.18);
+  --color-site-page: #f5f7fa;
+  --color-site-border: #e8ecf2;
+
+  --color-surface-page: #f5f7fa;
+  --color-surface-card: #ffffff;
+  --color-surface-sidebar: #f0f2f5;
+  --color-surface-border: #d8e2ef;
+  --color-surface-border-light: #e8ecf2;
+  --color-surface-muted: #e2e6ed;
+  --color-surface-input: #ffffff;
+
+  --color-text-primary: #1a2a4a;
+  --color-text-secondary: #4a6080;
+  --color-text-muted: #7a90a8;
+  --color-text-on-primary: #ffffff;
+  --color-text-sidebar-label: #4a5a6a;
+  --color-text-sidebar-active: #ffffff;
+  --color-sidebar-hover: #e2e6ed;
+
+  --color-accent-blue: #2a4a7a;
+  --color-accent-blue-light: rgba(42, 74, 122, 0.12);
+  --color-accent-amber: #e8a020;
+  --color-accent-amber-light: rgba(232, 160, 32, 0.12);
+  --color-accent-green: #10b981;
+  --color-accent-green-light: #ecfdf5;
+  --color-accent-violet: #6d28d9;
+  --color-accent-violet-light: #f5f3ff;
+  --color-accent-slate: #475569;
+  --color-accent-slate-light: #f1f5f9;
+
+  --radius-card: 12px;
+  --radius-nav: 8px;
+
+  --font-sans: "DM Sans", system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    @apply antialiased;
+    font-family: var(--font-sans);
+  }
+
+  body {
+    @apply bg-surface-page text-text-primary;
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  th {
+    @apply text-text-primary;
+  }
+
+  label {
+    @apply text-text-secondary;
+  }
+
+  td {
+    @apply text-text-secondary;
+  }
+
+  p {
+    @apply text-text-secondary;
+  }
+
+  strong {
+    @apply font-semibold text-text-primary;
+  }
+}
+
+@layer components {
+  .app-page {
+    @apply min-h-screen bg-surface-page text-text-primary;
+  }
+
+  .app-card {
+    @apply rounded-[10px] border border-surface-border-light bg-surface-card;
+  }
+
+  .app-panel {
+    @apply rounded-[10px] border border-surface-border-light bg-surface-card p-4 lg:p-5;
+  }
+
+  .table-head-sidebar {
+    background-color: #1c2a3a;
+  }
+
+  .app-input {
+    @apply w-full rounded-lg border border-site-border bg-surface-input px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-brand-amber focus:ring-2 focus:ring-brand-amber/15;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-amber px-4 py-2 text-sm font-semibold text-text-on-brand transition hover:bg-brand-amber-hover disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-surface-border-light bg-surface-card px-4 py-2 text-sm font-medium text-text-secondary transition hover:bg-surface-muted;
+  }
+
+  .pill-new {
+    @apply inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold;
+    background-color: var(--color-accent-amber-light);
+    color: var(--color-accent-amber);
+  }
+
+  .pill-estimated {
+    @apply inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold;
+    background-color: var(--color-accent-blue-light);
+    color: var(--color-accent-blue);
+  }
+
+  .pill-approved {
+    @apply inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold;
+    background-color: var(--color-accent-green-light);
+    color: var(--color-accent-green);
+  }
+
+  .dashboard-card {
+    @apply rounded-[12px] border border-surface-border-light bg-surface-card;
+  }
+
+  .dashboard-panel {
+    @apply rounded-[10px] border border-surface-border-light bg-surface-card p-4 lg:p-5;
+  }
+
+  .dashboard-hero {
+    @apply rounded-[10px] border border-surface-border-light bg-white px-4 py-4 sm:px-5 sm:py-5;
+  }
+
+  .dashboard-stat-card {
+    @apply w-full rounded-[10px] border border-surface-border-light bg-white p-3 transition duration-200;
+  }
+
+  a.group:hover .dashboard-stat-card,
+  .dashboard-stat-card:hover {
+    border-color: rgba(232, 160, 32, 0.5);
+    background-color: #fffbf5;
+  }
+
+  .dashboard-filter {
+    @apply inline-flex items-center gap-2 rounded-[12px] border border-surface-border-light bg-surface-card px-3 py-2 text-xs font-medium text-text-primary outline-none transition focus:border-brand-amber focus:ring-2 focus:ring-brand-amber/15;
+  }
+
+  .sidebar-nav-active {
+    color: #ffffff !important;
+    background-color: var(--color-brand-amber) !important;
+    border-left-color: transparent !important;
+  }
+
+  .sidebar-nav-active svg {
+    color: #ffffff;
+  }
+
+  .sidebar-nav-idle {
+    color: var(--color-text-sidebar-label);
+    border-left-color: transparent;
+    background-color: transparent;
+  }
+
+  .sidebar-nav-idle svg {
+    color: var(--color-text-sidebar-label);
+  }
+
+  .sidebar-nav-idle:hover {
+    background-color: var(--color-sidebar-hover) !important;
+    color: var(--color-brand-navy) !important;
+  }
+
+  .sidebar-nav-idle:hover svg {
+    color: var(--color-brand-navy);
+  }
+
+  .nav-item-active {
+    color: #ffffff !important;
+    background-color: var(--color-brand-amber) !important;
+    border-left-color: transparent !important;
+  }
+
+  .nav-item-idle {
+    color: var(--color-text-sidebar-label);
+    border-left-color: transparent;
+    background-color: transparent;
+  }
+
+  .nav-item-idle:hover {
+    background-color: var(--color-sidebar-hover) !important;
+    color: var(--color-brand-navy) !important;
+  }
+
+  .avatar-amber {
+    @apply flex items-center justify-center rounded-full bg-brand-amber font-bold text-white;
+  }
+
+  .site-survey-panel {
+    @apply overflow-hidden rounded-2xl border border-site-border bg-white;
+  }
+
+  .site-survey-header {
+    @apply border-b border-site-border bg-white px-5 py-5 sm:px-6 sm:py-6;
+  }
+
+  .site-survey-quick-bar {
+    @apply border-b border-site-border bg-surface-muted px-4 py-4 sm:px-6;
+  }
+
+  .site-survey-explore {
+    @apply shrink-0 rounded-lg bg-brand-amber px-4 py-2 text-xs font-semibold uppercase tracking-wide text-text-on-brand transition hover:bg-brand-amber-hover active:scale-[0.98];
+  }
+
+  .site-quick-jump-idle {
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-transparent bg-white px-3 py-2 text-[13px] font-medium text-text-on-brand transition hover:border-brand-amber/25 hover:bg-white;
+  }
+
+  .site-quick-jump-active {
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-amber/20 bg-brand-amber px-3 py-2 text-[13px] font-medium text-text-on-brand;
+  }
+
+  .site-survey-row {
+    @apply flex overflow-hidden rounded-xl border border-site-border bg-white transition hover:border-surface-border;
+  }
+
+  .site-survey-badge-empty {
+    @apply shrink-0 rounded-full bg-surface-muted px-2.5 py-1 text-[11px] font-semibold text-text-muted;
+  }
+
+  .site-survey-badge-filled {
+    @apply shrink-0 rounded-full bg-brand-amber/20 px-2.5 py-1 text-[11px] font-semibold text-text-on-brand;
+  }
+
+  .site-section-open-header {
+    @apply flex items-center justify-between gap-3 border-b border-brand-amber/20 bg-brand-amber px-4 py-3.5 text-text-on-brand sm:px-5;
+  }
+
+  .site-section-body {
+    @apply bg-brand-primary-light/25 px-4 py-5 sm:px-6;
+  }
+}
