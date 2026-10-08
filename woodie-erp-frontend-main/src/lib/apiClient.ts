@@ -2,8 +2,17 @@ import axios from "axios";
 
 const TOKEN_KEY = "woodie_auth_token";
 
+function normalizeApiBase(raw: string | undefined): string {
+  if (!raw) return "http://127.0.0.1:5000/api";
+  let url = raw.trim().replace(/\/+$/, "");
+  if (!url.endsWith("/api")) {
+    url = `${url}/api`;
+  }
+  return url;
+}
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api",
+  baseURL: normalizeApiBase(import.meta.env.VITE_API_BASE_URL),
 });
 
 api.interceptors.request.use((config) => {
@@ -36,7 +45,7 @@ export function setAuthToken(token: string | null) {
 export function getMediaUrl(path: string) {
   if (!path) return "";
   if (path.startsWith("http")) return path;
-  const apiBase = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api";
+  const apiBase = normalizeApiBase(import.meta.env.VITE_API_BASE_URL);
   const origin = apiBase.replace(/\/api\/?$/, "");
   return `${origin}${path.startsWith("/") ? path : `/${path}`}`;
 }

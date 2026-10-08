@@ -1,4 +1,4 @@
-﻿import { useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import woodieLogo from "../../../assets/logo/Woodie.png";
@@ -29,8 +29,10 @@ function LoginPage() {
       await login(email.trim(), password);
       const from = (location.state as { from?: string } | null)?.from;
       navigate(from || "/", { replace: true });
-    } catch {
-      setError("Invalid email or password.");
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = axiosErr.response?.data?.message || (axiosErr.message === "Network Error" ? "Unable to connect to server. Please check your internet or API connection." : axiosErr.message) || "Invalid email or password.";
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
