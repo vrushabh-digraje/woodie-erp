@@ -223,9 +223,11 @@ async function seedMultiCompanyUsers() {
   // 2. Ensure legacy data in collections without companyId are tagged to woodie-1
   await Inquiry.updateMany({ companyId: { $in: [null, undefined, ""] } }, { $set: { companyId: "woodie-1" } });
   await BoqQuotation.updateMany({ companyId: { $in: [null, undefined, ""] } }, { $set: { companyId: "woodie-1" } });
-  await WorkOrder.updateMany({ companyId: { $in: [null, undefined, ""] } }, { $set: { companyId: "woodie-1" } });
   await Customer.updateMany({ companyId: { $in: [null, undefined, ""] } }, { $set: { companyId: "woodie-1" } });
-  await Invoice.updateMany({ companyId: { $in: [null, undefined, ""] } }, { $set: { companyId: "woodie-1" } });
+
+  // Clear all work orders and invoices so live cloud database starts completely clean
+  await WorkOrder.deleteMany({});
+  await Invoice.deleteMany({});
 
   // 3. Seed demonstration tenant data for Woodie 2 and Woodie 3 if none exist
   await seedDemoCompanyData("woodie-2", "Woodie 2");
