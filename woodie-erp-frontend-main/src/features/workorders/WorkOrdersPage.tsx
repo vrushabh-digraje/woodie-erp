@@ -29,7 +29,7 @@ import { isFieldRole } from "../auth/permissions";
 const STATUS_OPTIONS: Array<WorkOrderStatus | "All"> = ["All", ...WORK_ORDER_STATUS_OPTIONS];
 
 function WorkOrdersPage() {
-  const { user } = useAuth();
+  const { user, activeCompany } = useAuth();
   const role = user?.role ?? "sales";
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [search, setSearch] = useState("");
@@ -52,11 +52,11 @@ function WorkOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, page]);
+  }, [search, statusFilter, page, activeCompany]);
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, activeCompany]);
 
   useEffect(() => {
     void load();
@@ -181,6 +181,7 @@ function WorkOrdersPage() {
                 <DataTable>
                   <DataTableHeader>
                     <DataTableHeadRow>
+                      <DataTableTh>Company</DataTableTh>
                       <DataTableTh>Number</DataTableTh>
                       <DataTableTh>Project</DataTableTh>
                       <DataTableTh>Client</DataTableTh>
@@ -193,6 +194,19 @@ function WorkOrdersPage() {
                   <DataTableBody>
                     {orders.map((wo) => (
                       <DataTableRow key={wo._id}>
+                        <DataTableTd className="whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold border ${
+                              wo.companyId === "woodie-2"
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : wo.companyId === "woodie-3"
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : "bg-blue-50 text-blue-800 border-blue-200"
+                            }`}
+                          >
+                            {wo.companyId === "woodie-2" ? "Woodie 2" : wo.companyId === "woodie-3" ? "Woodie 3" : "Woodie 1"}
+                          </span>
+                        </DataTableTd>
                         <DataTableTd className="max-w-[5rem] font-medium">
                           <TruncatedText text={wo.workOrderNumber} maxClass="max-w-[5rem]" />
                         </DataTableTd>

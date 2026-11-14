@@ -12,16 +12,16 @@ export const categoryBadgeStyles: Record<BoqCategory, string> = {
 };
 
 export const statusBadgeStyles: Record<QuotationStatus, string> = {
-  "BOQ In Progress": "bg-gray-100 text-gray-600",
-  "Quotation Draft": "bg-gray-100 text-gray-600",
-  "Pending Approval": "bg-gray-100 text-gray-600",
-  Approved: "bg-blue-100 text-blue-700",
-  Rejected: "bg-gray-100 text-gray-600",
-  "Revision Requested": "bg-gray-100 text-gray-600",
-  "Quotation Sent": "bg-purple-100 text-purple-700",
-  Negotiation: "bg-amber-100 text-amber-700",
-  Won: "bg-green-100 text-green-700",
-  Lost: "bg-red-100 text-red-700",
+  "BOQ In Progress": "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-600/20",
+  "Quotation Draft": "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-600/20",
+  "Pending Approval": "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20",
+  Approved: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",
+  Rejected: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-600/20",
+  "Revision Requested": "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-600/20",
+  "Quotation Sent": "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",
+  Negotiation: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",
+  Won: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",
+  Lost: "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-500/20",
 };
 
 export const WORKFLOW_STEPS: QuotationStatus[] = [
@@ -40,11 +40,164 @@ export function CategoryBadge({ category }: { category: BoqCategory }) {
   );
 }
 
-export function StatusBadge({ status }: { status: QuotationStatus }) {
+export function getBoqDisplayStatus(status: QuotationStatus | string): {
+  label: string;
+  className: string;
+  dotClassName?: string;
+} {
+  switch (status) {
+    case "Approved":
+    case "Quotation Sent":
+    case "Negotiation":
+    case "Won":
+    case "BOQ Done":
+      return {
+        label: "BOQ Done",
+        className: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+        dotClassName: "bg-emerald-500",
+      };
+    case "Pending Approval":
+    case "Pending":
+    case "BOQ Pending":
+      return {
+        label: "Pending",
+        className: "bg-amber-50 text-amber-700 border border-amber-200",
+        dotClassName: "bg-amber-500",
+      };
+    case "BOQ In Progress":
+    case "Quotation Draft":
+    case "Revision Requested":
+    case "BOQ Progress":
+    case "BOQ Processing":
+    case "In Progress":
+      return {
+        label: "BOQ Progress",
+        className: "bg-sky-50 text-sky-700 border border-sky-200",
+        dotClassName: "bg-sky-500",
+      };
+    case "Rejected":
+      return {
+        label: "Rejected",
+        className: "bg-rose-50 text-rose-700 border border-rose-200",
+        dotClassName: "bg-rose-500",
+      };
+    case "Lost":
+      return {
+        label: "Lost",
+        className: "bg-slate-100 text-slate-700 border border-slate-200",
+        dotClassName: "bg-slate-400",
+      };
+    default:
+      return {
+        label: status || "—",
+        className: "bg-slate-100 text-slate-700 border border-slate-200",
+        dotClassName: "bg-slate-400",
+      };
+  }
+}
+
+export function StatusBadge({
+  status,
+  showOriginal = false,
+}: {
+  status: QuotationStatus | string;
+  showOriginal?: boolean;
+}) {
+  const meta = getBoqDisplayStatus(status);
   return (
-    <span className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold ${statusBadgeStyles[status]}`}>
-      {status}
+    <span
+      title={`Stage: ${status}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${meta.className}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${meta.dotClassName || "bg-current"}`} />
+      <span>{meta.label}</span>
+      {showOriginal && status !== meta.label ? (
+        <span className="ml-1 text-[10px] font-normal opacity-75">({status})</span>
+      ) : null}
     </span>
+  );
+}
+
+export function isQuotationSubmitted(quotation?: {
+  sentAt?: string | null;
+  status?: QuotationStatus | string;
+} | null): boolean {
+  if (!quotation) return false;
+  return Boolean(
+    quotation.sentAt ||
+      ["Quotation Sent", "Negotiation", "Won"].includes(String(quotation.status || "")),
+  );
+}
+
+export function QuotationSubmissionBadge({
+  quotation,
+  onToggle,
+  canEdit = false,
+  loading = false,
+}: {
+  quotation: {
+    _id: string;
+    sentAt?: string | null;
+    status: QuotationStatus | string;
+    quotationNumber?: string;
+  };
+  onToggle?: (targetSubmitted: boolean) => void | Promise<void>;
+  canEdit?: boolean;
+  loading?: boolean;
+}) {
+  const submitted = isQuotationSubmitted(quotation);
+
+  if (!canEdit || !onToggle) {
+    return (
+      <span
+        title={
+          submitted && quotation.sentAt
+            ? `Submitted at: ${new Date(quotation.sentAt).toLocaleString()}`
+            : undefined
+        }
+        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${
+          submitted
+            ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20"
+            : "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/20"
+        }`}
+      >
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${submitted ? "bg-emerald-500" : "bg-slate-400"}`}
+        />
+        {submitted ? "Submitted" : "Not Submitted"}
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!loading) {
+          void onToggle(!submitted);
+        }
+      }}
+      disabled={loading}
+      title={
+        submitted
+          ? `Quotation submitted${
+              quotation.sentAt ? ` on ${new Date(quotation.sentAt).toLocaleDateString()}` : ""
+            }. Click to mark as Not Submitted.`
+          : "Click to mark quotation as Submitted to client"
+      }
+      className={`group inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all whitespace-nowrap cursor-pointer hover:shadow-xs focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+        submitted
+          ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 hover:bg-emerald-100 focus:ring-emerald-500"
+          : "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20 hover:bg-amber-100 focus:ring-amber-500"
+      } ${loading ? "opacity-60 cursor-wait" : ""}`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${submitted ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
+      />
+      <span>{submitted ? "Submitted" : "Not Submitted"}</span>
+      <span className="text-[10px] text-text-muted opacity-70 group-hover:opacity-100">✎</span>
+    </button>
   );
 }
 

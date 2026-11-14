@@ -8,6 +8,7 @@ export type AuthUser = {
   email: string;
   phone: string;
   role: UserRole;
+  companyId?: string | null;
   employeeId: string;
   status: "Active" | "Inactive";
 };

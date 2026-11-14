@@ -36,7 +36,7 @@ import {
 const STATUS_OPTIONS: Array<MaterialRequestStatus | "All"> = ["All", ...MATERIAL_REQUEST_STATUSES];
 
 export function MaterialRequestsSection() {
-  const { user } = useAuth();
+  const { user, activeCompany } = useAuth();
   const role = user?.role ?? "admin";
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
   const [search, setSearch] = useState("");
@@ -61,7 +61,7 @@ export function MaterialRequestsSection() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, search, page]);
+  }, [statusFilter, search, page, activeCompany]);
 
   useEffect(() => {
     void load();
@@ -69,7 +69,7 @@ export function MaterialRequestsSection() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, activeCompany]);
 
   async function openDetail(id: string) {
     try {
@@ -217,7 +217,22 @@ export function MaterialRequestsSection() {
                   className="w-full rounded-xl border border-surface-border-light p-4 text-left"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="font-mono text-sm font-semibold">{r.requestNumber}</span>
+                    <div>
+                      {r.companyId && (
+                        <span
+                          className={`mb-1 inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold border ${
+                            r.companyId === "woodie-2"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : r.companyId === "woodie-3"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : "bg-blue-50 text-blue-800 border-blue-200"
+                          }`}
+                        >
+                          {r.companyId === "woodie-2" ? "Woodie 2" : r.companyId === "woodie-3" ? "Woodie 3" : "Woodie 1"}
+                        </span>
+                      )}
+                      <p className="font-mono text-sm font-semibold">{r.requestNumber}</p>
+                    </div>
                     <MaterialRequestStatusBadge status={r.status} />
                   </div>
                   <p className="mt-1 text-sm">{r.workOrderNumber}</p>
@@ -229,6 +244,7 @@ export function MaterialRequestsSection() {
               <DataTable>
                 <DataTableHeader>
                   <DataTableHeadRow>
+                    <DataTableTh>Company</DataTableTh>
                     <DataTableTh>Request</DataTableTh>
                     <DataTableTh>Work order</DataTableTh>
                     <DataTableTh>Project</DataTableTh>
@@ -240,6 +256,19 @@ export function MaterialRequestsSection() {
                 <DataTableBody>
                   {requests.map((r) => (
                     <DataTableRow key={r._id}>
+                      <DataTableTd className="whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold border ${
+                            r.companyId === "woodie-2"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : r.companyId === "woodie-3"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : "bg-blue-50 text-blue-800 border-blue-200"
+                          }`}
+                        >
+                          {r.companyId === "woodie-2" ? "Woodie 2" : r.companyId === "woodie-3" ? "Woodie 3" : "Woodie 1"}
+                        </span>
+                      </DataTableTd>
                       <DataTableTd className="font-mono text-xs font-semibold">{r.requestNumber}</DataTableTd>
                       <DataTableTd>{r.workOrderNumber}</DataTableTd>
                       <DataTableTd className="max-w-[200px]">

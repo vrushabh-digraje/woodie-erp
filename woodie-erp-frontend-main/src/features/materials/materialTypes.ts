@@ -13,6 +13,7 @@ export type StockTransaction = {
 
 export type Material = {
   _id: string;
+  companyId?: string;
   name: string;
   SKU: string;
   unit: MaterialUnit;
@@ -56,6 +57,7 @@ export type MaterialRequestActivity = {
 
 export type MaterialRequest = {
   _id: string;
+  companyId?: string;
   requestNumber: string;
   workOrderId: string;
   workOrderNumber: string;

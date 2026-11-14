@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const { ROLE_OPTIONS } = require("../config/rbac");
 
@@ -12,6 +12,7 @@ const teamMemberSchema = new mongoose.Schema(
     phone: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     role: { type: String, required: true, enum: roleSlugs },
+    companyId: { type: String, default: "woodie-1", trim: true, lowercase: true },
     status: { type: String, enum: teamMemberStatuses, default: "Active" },
     passwordHash: { type: String, required: true, select: false },
   },

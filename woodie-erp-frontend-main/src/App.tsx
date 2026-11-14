@@ -8,6 +8,7 @@ import BoqCostingPage from "./features/boq/BoqCostingPage";
 import WorkOrderDetailPage from "./features/workorders/WorkOrderDetailPage";
 import WorkOrdersPage from "./features/workorders/WorkOrdersPage";
 import RoleDashboardPage from "./features/dashboard/RoleDashboardPage";
+import MasterDashboardPage from "./features/dashboard/MasterDashboardPage";
 import CreateInquiryPage from "./features/inquiry/pages/CreateInquiryPage";
 import EditInquiryPage from "./features/inquiry/pages/EditInquiryPage";
 import MyVisitsPage from "./features/inquiry/pages/EngineerVisitsPage";
@@ -21,12 +22,65 @@ import MaterialRequestPage from "./features/materials/MaterialRequestPage";
 import InvoiceListPage from "./features/invoices/InvoiceListPage";
 import InvoiceDetailPage from "./features/invoices/InvoiceDetailPage";
 import CreateInvoicePage from "./features/invoices/CreateInvoicePage";
-const SALES_OR_ADMIN = [ROLES.ADMIN, ROLES.SALES];
-const FINANCE_ROLES = [ROLES.ADMIN, ROLES.MANAGER, ROLES.SALES, ROLES.ACCOUNTS];
-const BOQ_ROLES = [ROLES.ADMIN, ROLES.SALES, ROLES.MANAGER, ROLES.PROCUREMENT];
-const WORK_ORDER_ROLES = [ROLES.ADMIN, ROLES.SALES, ROLES.MANAGER, ROLES.PROCUREMENT, ...FIELD_ROLES];
-const MATERIALS_HUB_ROLES = [ROLES.ADMIN, ROLES.MANAGER, ROLES.PROCUREMENT, ...FIELD_ROLES];
+import { useAuth } from "./features/auth/AuthContext";
+
+const INQUIRY_ROLES = [
+  ROLES.MASTER_ADMIN,
+  ROLES.ADMIN,
+  ROLES.SALES,
+  ROLES.MANAGER,
+  ROLES.OPERATION_MANAGER,
+  ROLES.ENGINEER,
+];
+
+const FINANCE_ROLES = [
+  ROLES.MASTER_ADMIN,
+  ROLES.ADMIN,
+  ROLES.MANAGER,
+  ROLES.OPERATION_MANAGER,
+  ROLES.SALES,
+  ROLES.ACCOUNTS,
+];
+
+const BOQ_ROLES = [
+  ROLES.MASTER_ADMIN,
+  ROLES.ADMIN,
+  ROLES.SALES,
+  ROLES.MANAGER,
+  ROLES.OPERATION_MANAGER,
+  ROLES.ENGINEER,
+  ROLES.PROCUREMENT,
+];
+
+const WORK_ORDER_ROLES = [
+  ROLES.MASTER_ADMIN,
+  ROLES.ADMIN,
+  ROLES.SALES,
+  ROLES.MANAGER,
+  ROLES.OPERATION_MANAGER,
+  ROLES.PROCUREMENT,
+  ...FIELD_ROLES,
+];
+
+const MATERIALS_HUB_ROLES = [
+  ROLES.MASTER_ADMIN,
+  ROLES.ADMIN,
+  ROLES.MANAGER,
+  ROLES.OPERATION_MANAGER,
+  ROLES.PROCUREMENT,
+  ...FIELD_ROLES,
+];
+
 const MATERIAL_REQUEST_CREATE_ROLES = [...FIELD_ROLES];
+const TEAM_ROLES = [ROLES.MASTER_ADMIN, ROLES.ADMIN, ROLES.MANAGER];
+
+function DashboardRoute() {
+  const { user } = useAuth();
+  if (user?.role === ROLES.MASTER_ADMIN) {
+    return <MasterDashboardPage />;
+  }
+  return <RoleDashboardPage />;
+}
 
 function App() {
   return (
@@ -34,9 +88,10 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
 
       <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<RoleDashboardPage />} />
+        <Route path="/" element={<DashboardRoute />} />
+        <Route path="/master-dashboard" element={<MasterDashboardPage />} />
 
-        <Route element={<ProtectedRoute allowedRoles={SALES_OR_ADMIN} />}>
+        <Route element={<ProtectedRoute allowedRoles={INQUIRY_ROLES} />}>
           <Route path="/inquiry/inquiries" element={<InquiryListingPage />} />
           <Route path="/inquiry/inquiries/new" element={<CreateInquiryPage />} />
           <Route path="/inquiry/inquiries/:id/edit" element={<EditInquiryPage />} />
@@ -48,7 +103,7 @@ function App() {
 
         <Route path="/inquiry/inquiries/:id" element={<InquiryDetailsPage />} />
 
-        <Route element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]} />}>
+        <Route element={<ProtectedRoute allowedRoles={TEAM_ROLES} />}>
           <Route path="/team" element={<TeamListingPage />} />
           <Route path="/team/new" element={<CreateTeamPage />} />
           <Route path="/team/:id/edit" element={<EditTeamPage />} />
@@ -56,8 +111,10 @@ function App() {
 
         <Route element={<ProtectedRoute allowedRoles={BOQ_ROLES} />}>
           <Route path="/boq" element={<BoqPage />} />
+          <Route path="/boq/quotations" element={<Navigate to="/boq" replace />} />
           <Route path="/quotations" element={<Navigate to="/boq" replace />} />
           <Route path="/boq/:id" element={<QuotationDetailPage />} />
+          <Route path="/boq/quotations/:id" element={<QuotationDetailPage />} />
           <Route path="/boq/:id/costing" element={<BoqCostingPage />} />
         </Route>
 
@@ -89,4 +146,3 @@ function App() {
 }
 
 export default App;
-

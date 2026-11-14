@@ -7,6 +7,7 @@ const {
   activityActor,
   assertInquiryAccess,
   assertAssignedPersonAction,
+  assertVisitApprovalAccess,
   assertSiteSurveyWriteAccess,
   assertSiteSurveyMediaUpload,
   buildInquiryListFilter,
@@ -190,7 +191,16 @@ async function decorateInquiry(inquiry) {
   if (plain.siteReport) {
     migrateSiteReportScopes(plain.siteReport);
   }
-  plain.boqPrepared = Boolean(await BoqQuotation.exists({ inquiryId: inquiry._id }));
+  const boq = await BoqQuotation.findOne(
+    { inquiryId: inquiry._id },
+    { quotationNumber: 1, status: 1 },
+  ).lean();
+  plain.boqPrepared = Boolean(boq);
+  if (boq) {
+    plain.boqId = boq._id;
+    plain.boqNumber = boq.quotationNumber;
+    plain.boqStatus = boq.status;
+  }
   return plain;
 }
 
@@ -302,22 +312,72 @@ function mapUploadedAttachments(files, inquiryId) {
 }
 
 async function listInquiries(req, res) {
+  try {
+    const { ensureQuotationsForCompletedSiteVisits } = require("./boqController");
+    await ensureQuotationsForCompletedSiteVisits();
+  } catch (err) {
+    console.error("listInquiries ensureQuotations error:", err);
+  }
+
   const filter = buildInquiryListFilter(req);
   const pageParam = Number(req.query?.page);
   const pageSizeParam = Number(req.query?.pageSize);
   const usePagination = Number.isFinite(pageParam) && pageParam > 0;
   if (!usePagination) {
     const data = await Inquiry.find(filter).sort({ createdAt: -1 });
-    return res.json(data);
+    const inquiryIds = data.map((i) => i._id);
+    const existingBoqs = await BoqQuotation.find(
+      { inquiryId: { $in: inquiryIds } },
+      { inquiryId: 1, quotationNumber: 1, status: 1 },
+    ).lean();
+    const boqMap = new Map();
+    for (const b of existingBoqs) {
+      boqMap.set(String(b.inquiryId), b);
+    }
+    const items = data.map((doc) => {
+      const plain = doc.toObject ? doc.toObject() : { ...doc };
+      const b = boqMap.get(String(plain._id));
+      plain.boqPrepared = Boolean(b);
+      if (b) {
+        plain.boqId = b._id;
+        plain.boqNumber = b.quotationNumber;
+        plain.boqStatus = b.status;
+      }
+      return plain;
+    });
+    return res.json(items);
   }
 
   const page = Math.max(1, Math.floor(pageParam));
   const pageSize = Math.min(100, Math.max(1, Math.floor(pageSizeParam || 20)));
   const skip = (page - 1) * pageSize;
-  const [items, total] = await Promise.all([
+  const [docs, total] = await Promise.all([
     Inquiry.find(filter).sort({ createdAt: -1 }).skip(skip).limit(pageSize),
     Inquiry.countDocuments(filter),
   ]);
+
+  const inquiryIds = docs.map((i) => i._id);
+  const existingBoqs = await BoqQuotation.find(
+    { inquiryId: { $in: inquiryIds } },
+    { inquiryId: 1, quotationNumber: 1, status: 1 },
+  ).lean();
+  const boqMap = new Map();
+  for (const b of existingBoqs) {
+    boqMap.set(String(b.inquiryId), b);
+  }
+
+  const items = docs.map((doc) => {
+    const plain = doc.toObject ? doc.toObject() : { ...doc };
+    const b = boqMap.get(String(plain._id));
+    plain.boqPrepared = Boolean(b);
+    if (b) {
+      plain.boqId = b._id;
+      plain.boqNumber = b.quotationNumber;
+      plain.boqStatus = b.status;
+    }
+    return plain;
+  });
+
   return res.json({
     items,
     total,
@@ -339,6 +399,7 @@ async function createInquiry(req, res) {
 
   const inquiry = await Inquiry.create({
     ...mapInquiryBody(req.body),
+    companyId: req.companyId || (req.user?.companyId || "woodie-1"),
     inquiryNumber,
     assignedPersonId: personResult.assignedPersonId,
     assignedPersonName: personResult.assignedPersonName,
@@ -423,7 +484,7 @@ async function decideVisitApproval(req, res) {
   const { decision, rejectionReason = "" } = req.body;
   const inquiry = await Inquiry.findById(req.params.id);
   if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
-  if (!assertAssignedPersonAction(inquiry, req.user, res)) return undefined;
+  if (!assertVisitApprovalAccess(inquiry, req.user, res)) return undefined;
 
   if (inquiry.status !== "Visit Pending Approval") {
     return res.status(400).json({ message: "Visit can only be approved or rejected while pending approval" });
@@ -563,6 +624,12 @@ async function submitSiteReport(req, res) {
   );
 
   await inquiry.save();
+  try {
+    const { ensureQuotationsForCompletedSiteVisits } = require("./boqController");
+    await ensureQuotationsForCompletedSiteVisits();
+  } catch (err) {
+    console.error("submitSiteReport ensureQuotations error:", err);
+  }
   return res.json(await decorateInquiry(inquiry));
 }
 

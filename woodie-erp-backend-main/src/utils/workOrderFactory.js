@@ -71,14 +71,16 @@ async function createWorkOrderFromQuotation(quotationId, options = {}) {
 
   const doc = await WorkOrder.create({
     workOrderNumber,
+    companyId: boq.companyId || (inquiry.companyId || "woodie-1"),
     inquiryId: boq.inquiryId,
     quotationId: boq._id,
     projectName: boq.projectName || inquiry.scopeOfWork || "Project",
     clientName: boq.clientName || inquiry.clientName,
     clientPhone: boq.clientPhone || inquiry.phone || "",
     clientEmail: boq.clientEmail || "",
-    siteAddress: inquiry.fullAddress || "",
-    scopeOfWork: inquiry.scopeOfWork || "",
+    clientRef: boq.clientRef || inquiry.inquiryNumber || inquiry.clientRefNo || "",
+    siteAddress: boq.location || inquiry.fullAddress || "",
+    scopeOfWork: boq.subject || inquiry.scopeOfWork || "",
     approvedAmount: Math.round(approvedExTax * 100) / 100,
     scheduledStart: parseOptionalDate(options.scheduledStart),
     targetCompletion: parseOptionalDate(options.targetCompletion),

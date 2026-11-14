@@ -1,7 +1,8 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const { ROLE_OPTIONS } = require("../config/rbac");
 
-const ROLES = ["admin", "sales", "site_engineer", "manager"];
+const ROLES = ROLE_OPTIONS.map((r) => r.value);
 
 const userSchema = new mongoose.Schema(
   {
@@ -9,6 +10,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: ROLES, required: true },
+    companyId: { type: String, default: "woodie-1", trim: true, lowercase: true },
     isActive: { type: Boolean, default: true },
     teamMemberId: { type: mongoose.Schema.Types.ObjectId, ref: "TeamMember", default: null },
   },
@@ -26,4 +28,3 @@ userSchema.statics.hashPassword = async function hashPassword(plain) {
 const User = mongoose.model("User", userSchema);
 
 module.exports = { User, ROLES };
-

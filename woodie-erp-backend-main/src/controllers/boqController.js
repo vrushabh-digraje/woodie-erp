@@ -1,6 +1,16 @@
 const { BoqQuotation, recalculateTotals } = require("../models/BoqQuotation");
 const { Inquiry } = require("../models/Inquiry");
 const { WorkOrder } = require("../models/WorkOrder");
+const { buildTenantFilter } = require("../middleware/tenantIsolation");
+const { canApproveBoq, isMasterAdmin } = require("../config/rbac");
+
+function matchesQuotationCompany(doc, user) {
+  if (!doc || !user) return false;
+  if (isMasterAdmin(user.role)) return true;
+  const userCo = (user.companyId || "woodie-1").toLowerCase();
+  const docCo = (doc.companyId || "woodie-1").toLowerCase();
+  return userCo === docCo;
+}
 
 const QUOTATION_DELETABLE_STATUSES = [
   "BOQ In Progress",
@@ -51,6 +61,34 @@ async function generateQuotationNumber() {
   return `QT-${String(maxSeq + 1).padStart(4, "0")}`;
 }
 
+function formatNormalAddress(raw, fallbackEmirate = "Dubai") {
+  if (!raw || !String(raw).trim()) return "";
+  let cleaned = String(raw)
+    .replace(/\s*(?:>|->|→)\s*/g, ", ")
+    .replace(/\b(?:near|opposite|next to|behind)\s+(?:the\s+)?(?:elevator|lift|stairs|staircase|lobby|reception)\b[^\n,;]*/gi, "")
+    .replace(/\b(?:\d+(?:st|nd|rd|th)?|ground|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|mezzanine|basement)\s+(?:floor|flr|level|lvl)\b/gi, "")
+    .replace(/\b(?:floor|flr|level|lvl)\s*(?:no\.?|#)?\s*\d+\b/gi, "")
+    .replace(/\b(?:room|rm)\s*(?:no\.?|#)?\s*[a-z0-9-]+\b/gi, "")
+    .replace(/[\r\n\t ]+/g, " ")
+    .replace(/\s*,\s*,+/g, ",")
+    .replace(/\s*;\s*/g, ", ")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/^[,\s\-:]+/, "")
+    .replace(/[,\s\-:]+$/, "")
+    .trim();
+
+  if (!cleaned || cleaned.length < 3) {
+    cleaned = String(raw).replace(/\s*(?:>|->|→)\s*/g, ", ").replace(/[\r\n]+/g, ", ").trim();
+  }
+
+  const em = String(fallbackEmirate || "Dubai").trim();
+  const lower = cleaned.toLowerCase();
+  if (em && !lower.includes(em.toLowerCase()) && !lower.includes("uae") && !lower.includes("united arab emirates")) {
+    cleaned = `${cleaned}, ${em}`;
+  }
+  return cleaned;
+}
+
 function normalizeItems(items) {
   if (!Array.isArray(items)) return [];
   return items.map((item) => ({
@@ -65,17 +103,104 @@ function normalizeItems(items) {
   })).filter((item) => item.description);
 }
 
+async function ensureQuotationsForCompletedSiteVisits() {
+  try {
+    const inquiries = await Inquiry.find({
+      $or: [
+        { status: "Site Report Attached" },
+        { "siteReport.reportSubmittedAt": { $ne: null } },
+      ],
+    }).lean();
+
+    if (!inquiries.length) return;
+
+    const existingBoqs = await BoqQuotation.find({
+      inquiryId: { $in: inquiries.map((i) => i._id) },
+    })
+      .select("inquiryId")
+      .lean();
+
+    const existingInquiryIds = new Set(
+      existingBoqs.filter((b) => b.inquiryId).map((b) => String(b.inquiryId)),
+    );
+
+    for (const inq of inquiries) {
+      if (existingInquiryIds.has(String(inq._id))) continue;
+
+      const quotationNumber = await generateQuotationNumber();
+      const siteInformation = siteInformationFromInquiry(inq);
+      const items = itemsFromSiteReport(inq);
+      const location = formatNormalAddress(
+        inq.fullAddress || inq.siteDetails,
+        inq.emirates || inq.state,
+      );
+
+      const doc = new BoqQuotation({
+        quotationNumber,
+        projectName: "",
+        clientName: String(inq.clientName || "TBD").trim(),
+        clientEmail: String(inq.email || "").trim(),
+        clientPhone: String(inq.phone || "").trim(),
+        inquiryId: inq._id,
+        location: "",
+        attn: "",
+        emirates: inq.emirates || inq.state || "Dubai",
+        clientRef: "",
+        vendorTrn: "",
+        subject: "",
+        revision: 0,
+        quoteDate: new Date(),
+        status: "BOQ In Progress",
+        items: normalizeItems(items),
+        taxPercent: 8,
+        discountPercent: 0,
+        paymentTerms: "Net 30 days",
+        notes: "",
+        siteInformation: siteInformation || null,
+        createdBy: inq.assignedPersonId || null,
+        createdByName: inq.assignedPersonName || "Site Team",
+        activityTimeline: [
+          activity(
+            "Site Visit Completed",
+            `Site visit completed — project imported into BOQ tool with line items from site report`,
+            inq.assignedPersonName || "Site Team",
+          ),
+        ],
+      });
+
+      recalculateTotals(doc);
+      await doc.save();
+      existingInquiryIds.add(String(inq._id));
+    }
+  } catch (err) {
+    console.error("ensureQuotationsForCompletedSiteVisits error:", err);
+  }
+}
+
 async function listQuotations(req, res) {
+  await ensureQuotationsForCompletedSiteVisits();
+
   const { q = "", status = "All" } = req.query;
   const search = String(q).trim();
   const filter = {};
 
   if (req.user.role === "sales") {
-    filter.createdBy = req.user._id;
+    filter.$or = [
+      { createdBy: req.user._id },
+      { createdBy: null },
+    ];
   }
 
-  if (status !== "All") {
-    filter.status = status;
+  if (status && status !== "All") {
+    if (status === "BOQ Done") {
+      filter.status = { $in: ["Approved", "Quotation Sent", "Negotiation", "Won"] };
+    } else if (status === "Pending") {
+      filter.status = "Pending Approval";
+    } else if (status === "BOQ Progress" || status === "BOQ Processing" || status === "In Progress") {
+      filter.status = { $in: ["BOQ In Progress", "Quotation Draft", "Revision Requested"] };
+    } else {
+      filter.status = status;
+    }
   }
 
   if (search) {
@@ -89,8 +214,9 @@ async function listQuotations(req, res) {
   const pageParam = Number(req.query?.page);
   const pageSizeParam = Number(req.query?.pageSize);
   const usePagination = Number.isFinite(pageParam) && pageParam > 0;
+  const scopedFilter = buildTenantFilter(req, filter);
   if (!usePagination) {
-    const data = await BoqQuotation.find(filter).sort({ updatedAt: -1 });
+    const data = await BoqQuotation.find(scopedFilter).sort({ updatedAt: -1 });
     return res.json(data);
   }
 
@@ -98,8 +224,8 @@ async function listQuotations(req, res) {
   const pageSize = Math.min(100, Math.max(1, Math.floor(pageSizeParam || 20)));
   const skip = (page - 1) * pageSize;
   const [items, total] = await Promise.all([
-    BoqQuotation.find(filter).sort({ updatedAt: -1 }).skip(skip).limit(pageSize),
-    BoqQuotation.countDocuments(filter),
+    BoqQuotation.find(scopedFilter).sort({ updatedAt: -1 }).skip(skip).limit(pageSize),
+    BoqQuotation.countDocuments(scopedFilter),
   ]);
   return res.json({
     items,
@@ -111,7 +237,8 @@ async function listQuotations(req, res) {
 }
 
 async function listPendingApprovals(req, res) {
-  const data = await BoqQuotation.find({ status: "Pending Approval" }).sort({ updatedAt: -1 });
+  const scopedFilter = buildTenantFilter(req, { status: "Pending Approval" });
+  const data = await BoqQuotation.find(scopedFilter).sort({ updatedAt: -1 });
   return res.json(data);
 }
 
@@ -133,6 +260,10 @@ async function getQuotation(req, res) {
   const doc = await BoqQuotation.findById(req.params.id);
   if (!doc) return res.status(404).json({ message: "Quotation not found" });
 
+  if (!matchesQuotationCompany(doc, req.user)) {
+    return res.status(403).json({ message: "You do not have access to quotations from another company" });
+  }
+
   if (req.user.role === "sales" && String(doc.createdBy) !== String(req.user._id)) {
     return res.status(403).json({ message: "You can only view your own quotations" });
   }
@@ -145,6 +276,10 @@ async function getQuotationByInquiry(req, res) {
   const { inquiryId } = req.params;
   const doc = await BoqQuotation.findOne({ inquiryId });
   if (!doc) return res.status(404).json({ message: "No BOQ linked to this inquiry yet" });
+
+  if (!matchesQuotationCompany(doc, req.user)) {
+    return res.status(403).json({ message: "You do not have access to quotations from another company" });
+  }
 
   if (req.user.role === "sales" && String(doc.createdBy) !== String(req.user._id)) {
     return res.status(403).json({ message: "You can only view your own quotations" });
@@ -213,13 +348,23 @@ async function createQuotation(req, res) {
   if (validationError) return res.status(400).json({ message: validationError });
 
   const quotationNumber = await generateQuotationNumber();
+  const companyId = req.companyId || (req.user?.companyId || "woodie-1");
   const doc = new BoqQuotation({
     quotationNumber,
-    projectName: payload.projectName,
-    clientName: payload.clientName,
-    clientEmail: payload.clientEmail,
-    clientPhone: payload.clientPhone,
+    companyId,
+    projectName: payload.projectName || "",
+    clientName: payload.clientName || "",
+    clientEmail: payload.clientEmail || "",
+    clientPhone: payload.clientPhone || "",
     inquiryId: payload.inquiryId || null,
+    location: payload.location ? String(payload.location).trim() : "",
+    attn: payload.attn ? String(payload.attn).trim() : "",
+    emirates: payload.emirates || "Dubai",
+    clientRef: payload.clientRef ? String(payload.clientRef).trim() : "",
+    vendorTrn: payload.vendorTrn ? String(payload.vendorTrn).trim() : "",
+    subject: payload.subject || "",
+    revision: Number(payload.revision) || 0,
+    quoteDate: payload.quoteDate ? new Date(payload.quoteDate) : new Date(),
     status: "BOQ In Progress",
     items: normalizeItems(payload.items),
     taxPercent: Number(payload.taxPercent),
@@ -263,9 +408,27 @@ async function updateQuotation(req, res) {
   if (validationError) return res.status(400).json({ message: validationError });
 
   if (req.body.projectName !== undefined) doc.projectName = String(req.body.projectName).trim();
+  if (req.body.location !== undefined) {
+    const rawLoc = String(req.body.location).trim();
+    doc.location = rawLoc.includes(">") || rawLoc.includes("->") || rawLoc.includes("→")
+      ? formatNormalAddress(rawLoc, doc.emirates)
+      : rawLoc;
+  }
   if (req.body.clientName !== undefined) doc.clientName = String(req.body.clientName).trim();
   if (req.body.clientEmail !== undefined) doc.clientEmail = String(req.body.clientEmail).trim();
   if (req.body.clientPhone !== undefined) doc.clientPhone = String(req.body.clientPhone).trim();
+  if (req.body.attn !== undefined) doc.attn = String(req.body.attn).trim();
+  if (req.body.emirates !== undefined) doc.emirates = String(req.body.emirates).trim();
+  if (req.body.clientRef !== undefined) {
+    doc.clientRef = String(req.body.clientRef).trim();
+    if (doc.inquiryId) {
+      await Inquiry.findByIdAndUpdate(doc.inquiryId, { $set: { clientRefNo: doc.clientRef } }).catch(() => {});
+    }
+  }
+  if (req.body.vendorTrn !== undefined) doc.vendorTrn = String(req.body.vendorTrn).trim();
+  if (req.body.subject !== undefined) doc.subject = String(req.body.subject).trim();
+  if (req.body.revision !== undefined) doc.revision = Number(req.body.revision) || 0;
+  if (req.body.quoteDate !== undefined) doc.quoteDate = req.body.quoteDate ? new Date(req.body.quoteDate) : null;
   if (req.body.paymentTerms !== undefined) doc.paymentTerms = String(req.body.paymentTerms).trim();
   if (req.body.notes !== undefined) doc.notes = String(req.body.notes).trim();
   if (req.body.taxPercent !== undefined) doc.taxPercent = Number(req.body.taxPercent);
@@ -394,6 +557,10 @@ async function submitForApproval(req, res) {
   const doc = await BoqQuotation.findById(req.params.id);
   if (!doc) return res.status(404).json({ message: "Quotation not found" });
 
+  if (!matchesQuotationCompany(doc, req.user)) {
+    return res.status(403).json({ message: "You do not have access to quotations from another company" });
+  }
+
   if (req.user.role === "sales" && String(doc.createdBy) !== String(req.user._id)) {
     return res.status(403).json({ message: "You can only submit your own quotations" });
   }
@@ -407,26 +574,16 @@ async function submitForApproval(req, res) {
 
   recalculateTotals(doc);
 
-  if (req.user.role === "admin") {
-    const remarks = String(req.body?.remarks ?? "").trim();
-    doc.status = "Approved";
-    doc.approval = {
-      reviewedBy: req.user._id,
-      reviewedByName: actorName(req),
-      remarks: remarks || "Approved by admin",
-      reviewedAt: new Date(),
-      action: "approved",
-    };
-    doc.activityTimeline.unshift(
-      activity("Approved", remarks || "Quotation saved and approved by admin", actorName(req)),
-    );
-  } else {
-    doc.status = "Pending Approval";
-    doc.approval = { reviewedBy: null, reviewedByName: "", remarks: "", reviewedAt: null, action: null };
-    doc.activityTimeline.unshift(
-      activity("Manager Approval", "Submitted to manager for approval", actorName(req)),
-    );
-  }
+  // Per RBAC hierarchy: Admin, Engineer, and Sales submissions require Manager approval
+  doc.status = "Pending Approval";
+  doc.approval = { reviewedBy: null, reviewedByName: "", remarks: "", reviewedAt: null, action: null };
+  doc.activityTimeline.unshift(
+    activity(
+      "Manager Approval",
+      `Submitted by ${actorName(req)} (${req.user?.role || "Staff"}) — awaiting Manager review`,
+      actorName(req),
+    ),
+  );
 
   await doc.save();
   return res.json(doc);
@@ -435,6 +592,14 @@ async function submitForApproval(req, res) {
 async function approveQuotation(req, res) {
   const doc = await BoqQuotation.findById(req.params.id);
   if (!doc) return res.status(404).json({ message: "Quotation not found" });
+
+  if (!matchesQuotationCompany(doc, req.user)) {
+    return res.status(403).json({ message: "You do not have access to quotations from another company" });
+  }
+
+  if (!canApproveBoq(req.user.role)) {
+    return res.status(403).json({ message: "Only Managers and Operation Managers can approve quotations" });
+  }
 
   if (doc.status !== "Pending Approval") {
     return res.status(400).json({ message: "Only pending quotations can be approved" });
@@ -450,7 +615,7 @@ async function approveQuotation(req, res) {
     action: "approved",
   };
   doc.activityTimeline.unshift(
-    activity("Approved", remarks || "Quotation approved by manager", actorName(req)),
+    activity("Approved", remarks || `Quotation approved by ${actorName(req)} (${req.user?.role || "Manager"})`, actorName(req)),
   );
   await doc.save();
   return res.json(doc);
@@ -459,6 +624,14 @@ async function approveQuotation(req, res) {
 async function rejectQuotation(req, res) {
   const doc = await BoqQuotation.findById(req.params.id);
   if (!doc) return res.status(404).json({ message: "Quotation not found" });
+
+  if (!matchesQuotationCompany(doc, req.user)) {
+    return res.status(403).json({ message: "You do not have access to quotations from another company" });
+  }
+
+  if (!canApproveBoq(req.user.role)) {
+    return res.status(403).json({ message: "Only Managers and Operation Managers can reject quotations" });
+  }
 
   if (doc.status !== "Pending Approval") {
     return res.status(400).json({ message: "Only pending quotations can be rejected" });
@@ -561,4 +734,5 @@ module.exports = {
   requestRevision,
   importSiteReportItems,
   deleteQuotation,
+  ensureQuotationsForCompletedSiteVisits,
 };

@@ -305,12 +305,12 @@ function buildWorkItemsSection(workItems, boqItems, quotationId) {
       `;
 
       return `<tr>
-        <td class="c" style="vertical-align:top;padding:8px 4px;font-size:10px;font-weight:bold;text-align:center;border:1px solid #000;color:#000;background:#fff;">${index + 1}</td>
-        <td class="desc" style="padding:8px 10px;vertical-align:top;font-size:9px;line-height:1.4;border:1px solid #000;color:#000;background:#fff;">${descCell}</td>
-        <td class="c" style="vertical-align:top;padding:8px 4px;font-size:10px;text-align:center;font-weight:600;border:1px solid #000;color:#000;background:#fff;">${escapeHtml(qty || "1")}</td>
-        <td class="c" style="vertical-align:top;padding:8px 4px;font-size:10px;text-align:center;border:1px solid #000;color:#000;background:#fff;">${escapeHtml(unit || "Nos")}</td>
-        <td class="r" style="vertical-align:top;padding:8px 6px;font-size:10px;text-align:right;font-weight:600;border:1px solid #000;color:#000;background:#fff;">${rate > 0 ? formatMoneyNum(rate) : "—"}</td>
-        <td class="r" style="vertical-align:top;padding:8px 6px;font-size:10px;text-align:right;font-weight:bold;color:#000;border:1px solid #000;background:#fff;">${rate > 0 || qtyNum ? formatMoneyNum(amount) : "—"}</td>
+        <td class="c" style="vertical-align:top;padding:8px 4px;font-size:10px;font-weight:bold;text-align:center;border:1px solid #000;color:#000;background:transparent;">${index + 1}</td>
+        <td class="desc" style="padding:8px 10px;vertical-align:top;font-size:9px;line-height:1.4;border:1px solid #000;color:#000;background:transparent;">${descCell}</td>
+        <td class="c" style="vertical-align:top;padding:8px 4px;font-size:10px;text-align:center;font-weight:600;border:1px solid #000;color:#000;background:transparent;">${escapeHtml(qty || "1")}</td>
+        <td class="c" style="vertical-align:top;padding:8px 4px;font-size:10px;text-align:center;border:1px solid #000;color:#000;background:transparent;">${escapeHtml(unit || "Nos")}</td>
+        <td class="r" style="vertical-align:top;padding:8px 6px;font-size:10px;text-align:right;font-weight:600;border:1px solid #000;color:#000;background:transparent;">${rate > 0 ? formatMoneyNum(rate) : "—"}</td>
+        <td class="r" style="vertical-align:top;padding:8px 6px;font-size:10px;text-align:right;font-weight:bold;color:#000;border:1px solid #000;background:transparent;">${rate > 0 || qtyNum ? formatMoneyNum(amount) : "—"}</td>
       </tr>`;
     })
     .filter(Boolean);
@@ -331,8 +331,8 @@ function buildWorkItemsSection(workItems, boqItems, quotationId) {
           </tr>
         </thead>
         <tbody>
-          <tr style="background:#fff;">
-            <td colspan="6" style="font-weight:bold;font-size:10.5px;padding:5px 8px;text-align:left;border:1px solid #000;background:#fff;color:#000;letter-spacing:0.02em;">
+          <tr style="background:transparent;">
+            <td colspan="6" style="font-weight:bold;font-size:10.5px;padding:5px 8px;text-align:left;border:1px solid #000;background:transparent;color:#000;letter-spacing:0.02em;">
               Scope of Work &amp; Itemized Specifications
             </td>
           </tr>
@@ -353,32 +353,26 @@ function buildAmountSummaryHtml(totals, refNo, subject) {
       <table class="wts amount-summary" style="width:100%;border-collapse:collapse;margin-top:0;border-top:none;">
         <tbody>
           <tr>
-            <td rowspan="5" style="width:16%;border:1px solid #000;font-weight:bold;vertical-align:middle;text-align:center;padding:8px 6px;font-size:9.5px;background:#fff;">
+            <td rowspan="5" style="width:16%;border:1px solid #000;font-weight:bold;vertical-align:middle;text-align:center;padding:8px 6px;font-size:9.5px;background:transparent;">
               Amount in<br />words:
             </td>
-            <td rowspan="5" style="width:36%;border:1px solid #000;vertical-align:middle;text-align:left;padding:10px 10px;font-size:9.5px;background:#fff;line-height:1.4;">
-              <div style="font-weight:600;color:#0f172a;margin-bottom:8px;">${escapeHtml(words)} (+VAT)</div>
-              <div style="border-top:1px dashed #cbd5e1;padding-top:6px;font-size:8px;color:#64748b;">
-                <span>💬 Quick Questions? </span>
-                <a href="https://wa.me/971564226955?text=Hello%20Woodie%2C%20regarding%20Quotation%20${encodeURIComponent(refNo)}" target="_blank" style="color:#059669;font-weight:bold;text-decoration:none;">
-                  Chat on WhatsApp ↗
-                </a>
-              </div>
+            <td rowspan="5" style="width:36%;border:1px solid #000;vertical-align:middle;text-align:left;padding:10px 10px;font-size:9.5px;background:transparent;line-height:1.4;">
+              <div style="font-weight:600;color:#0f172a;">${escapeHtml(words)} (+VAT)</div>
             </td>
-            <td style="width:26%;border:1px solid #000;font-weight:bold;padding:5px 8px;font-size:9.5px;background:#fff;">Sub Total</td>
-            <td style="width:22%;border:1px solid #000;text-align:right;font-weight:bold;padding:5px 8px;font-size:9.5px;background:#fff;">${formatMoneyNum(subtotal)}</td>
+            <td style="width:26%;border:1px solid #000;font-weight:bold;padding:5px 8px;font-size:9.5px;background:transparent;">Sub Total</td>
+            <td style="width:22%;border:1px solid #000;text-align:right;font-weight:bold;padding:5px 8px;font-size:9.5px;background:transparent;">${formatMoneyNum(subtotal)}</td>
           </tr>
           <tr>
-            <td style="border:1px solid #000;font-weight:bold;padding:5px 8px;font-size:9.5px;background:#fff;">Discount</td>
-            <td style="border:1px solid #000;text-align:right;padding:5px 8px;font-size:9.5px;background:#fff;">${discountDisplay}</td>
+            <td style="border:1px solid #000;font-weight:bold;padding:5px 8px;font-size:9.5px;background:transparent;">Discount</td>
+            <td style="border:1px solid #000;text-align:right;padding:5px 8px;font-size:9.5px;background:transparent;">${discountDisplay}</td>
           </tr>
           <tr>
-            <td style="border:1px solid #000;font-weight:bold;padding:5px 8px;font-size:9.5px;background:#fff;">Total excluding VAT</td>
-            <td style="border:1px solid #000;text-align:right;font-weight:bold;padding:5px 8px;font-size:9.5px;background:#fff;">${formatMoneyNum(totalExVat)}</td>
+            <td style="border:1px solid #000;font-weight:bold;padding:5px 8px;font-size:9.5px;background:transparent;">Total excluding VAT</td>
+            <td style="border:1px solid #000;text-align:right;font-weight:bold;padding:5px 8px;font-size:9.5px;background:transparent;">${formatMoneyNum(totalExVat)}</td>
           </tr>
           <tr>
-            <td style="border:1px solid #000;font-weight:bold;padding:5px 8px;font-size:9.5px;background:#fff;">VAT ${taxPercent}%</td>
-            <td style="border:1px solid #000;text-align:right;padding:5px 8px;font-size:9.5px;background:#fff;">${formatMoneyNum(taxAmount)}</td>
+            <td style="border:1px solid #000;font-weight:bold;padding:5px 8px;font-size:9.5px;background:transparent;">VAT ${taxPercent}%</td>
+            <td style="border:1px solid #000;text-align:right;padding:5px 8px;font-size:9.5px;background:transparent;">${formatMoneyNum(taxAmount)}</td>
           </tr>
           <tr>
             <td style="border:1px solid #000;font-weight:bold;padding:6px 8px;font-size:10px;background:#FCE4D6;">Grand Total</td>
@@ -424,7 +418,7 @@ function buildTechnicalSiteSurveyHtml(sites, shared, photos) {
     return `
       <tr>
         <td class="lbl" style="width:25%;background:#BDD7EE;font-weight:bold;font-size:8.5px;border:1px solid #000;padding:4px 6px;">${escapeHtml(label)}</td>
-        <td class="val" style="width:75%;background:#fff;font-size:9px;border:1px solid #000;padding:4px 6px;">${escapeHtml(val)}</td>
+        <td class="val" style="width:75%;background:transparent;font-size:9px;border:1px solid #000;padding:4px 6px;">${escapeHtml(val)}</td>
       </tr>
     `;
   }).filter(Boolean);
@@ -436,7 +430,7 @@ function buildTechnicalSiteSurveyHtml(sites, shared, photos) {
     return `
       <tr>
         <td class="lbl" style="width:25%;background:#BDD7EE;font-weight:bold;font-size:8.5px;border:1px solid #000;padding:4px 6px;">${escapeHtml(label)}</td>
-        <td class="val" style="width:75%;background:#fff;font-size:9px;border:1px solid #000;padding:4px 6px;">${escapeHtml(val)}</td>
+        <td class="val" style="width:75%;background:transparent;font-size:9px;border:1px solid #000;padding:4px 6px;">${escapeHtml(val)}</td>
       </tr>
     `;
   }).filter(Boolean);
@@ -537,18 +531,15 @@ function buildTermsExclusionsAcceptanceHtml(paymentTerms, representative, repPho
         <span style="font-weight:600;color:#0f172a;">${escapeHtml(paymentTerms)}</span>
       </div>
 
-      <div id="section-acceptance" style="border:1.5px solid #000;padding:10px;background:#fff;margin-top:6px;page-break-inside:avoid;">
-        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #000;padding-bottom:5px;margin-bottom:8px;">
+      <div id="section-acceptance" style="border:1.5px solid #000;padding:10px;background:#fff;margin-top:8px;page-break-inside:avoid;">
+        <div style="border-bottom:1.5px solid #000;padding-bottom:5px;margin-bottom:8px;">
           <span style="font-weight:bold;font-size:10.5px;color:#000;text-transform:uppercase;letter-spacing:0.04em;">
             Customer Acceptance &amp; Project Authorization
-          </span>
-          <span style="font-size:8px;font-weight:bold;color:#1e3a8a;background:#dbeafe;padding:2px 6px;border-radius:3px;">
-            Interactive Sign-off
           </span>
         </div>
 
         <p style="font-size:8.5px;color:#334155;margin-bottom:8px;line-height:1.4;">
-          By signing or digitally confirming below, the client accepts the scope of work, itemized specifications, financial values, and terms specified in this quotation (Ref: <strong>${escapeHtml(refNo)}</strong>).
+          By signing or digitally confirming below, the client accepts the scope of work, itemized specifications, financial values, and terms specified in this quotation (Ref: <strong>${escapeHtml(refNo)}</strong>${clientRef && clientRef !== "—" ? ` | Client Ref: <strong>${escapeHtml(clientRef)}</strong>` : ""}).
         </p>
 
         <div style="margin-bottom:8px;font-size:9px;">
@@ -562,7 +553,7 @@ function buildTermsExclusionsAcceptanceHtml(paymentTerms, representative, repPho
           <tr>
             <td style="width:18%;padding:4px;font-weight:bold;border:none;">Client Signatory:</td>
             <td style="width:32%;padding:4px;border:none;">
-              <input type="text" name="signatory_name" value="${escapeHtml(attn !== "—" ? attn : "")}" placeholder="Authorized Name" style="width:95%;border:1px solid #94a3b8;padding:3px 5px;font-size:8.5px;border-radius:2px;" />
+              <input type="text" name="signatory_name" value="${escapeHtml(attn && attn !== "—" ? attn : "")}" placeholder="Authorized Name" style="width:95%;border:1px solid #94a3b8;padding:3px 5px;font-size:8.5px;border-radius:2px;" />
             </td>
             <td style="width:18%;padding:4px;font-weight:bold;border:none;">Designation:</td>
             <td style="width:32%;padding:4px;border:none;">
@@ -572,43 +563,25 @@ function buildTermsExclusionsAcceptanceHtml(paymentTerms, representative, repPho
           <tr>
             <td style="padding:4px;font-weight:bold;border:none;">P.O. / Project Ref #:</td>
             <td style="padding:4px;border:none;">
-              <input type="text" name="po_ref" value="${escapeHtml(clientRef !== "—" ? clientRef : "")}" placeholder="Purchase Order Number" style="width:95%;border:1px solid #94a3b8;padding:3px 5px;font-size:8.5px;border-radius:2px;" />
+              <input type="text" name="po_ref" value="${escapeHtml(clientRef && clientRef !== "—" ? clientRef : "")}" placeholder="Purchase Order Number" style="width:95%;border:1px solid #94a3b8;padding:3px 5px;font-size:8.5px;border-radius:2px;" />
             </td>
-            <td style="padding:4px;font-weight:bold;border:none;">Date of Acceptance:</td>
+            <td style="padding:4px;border:none;">Date of Acceptance:</td>
             <td style="padding:4px;border:none;">
               <input type="text" name="acceptance_date" value="${formatPdfDate(new Date())}" style="width:95%;border:1px solid #94a3b8;padding:3px 5px;font-size:8.5px;border-radius:2px;" />
             </td>
           </tr>
         </table>
 
-        <div style="display:flex;justify-content:space-between;gap:12px;margin-top:6px;">
-          <div style="flex:1;border:1px solid #000;padding:8px;text-align:left;height:120px;display:flex;flex-direction:column;justify-content:space-between;background:#fafafa;">
+        <div style="display:flex;justify-content:flex-start;margin-top:6px;">
+          <div style="width:300px;border:1px solid #000;padding:8px;text-align:left;background:#fafafa;">
             <div>
               <div style="font-weight:bold;font-size:9px;color:#000;text-transform:uppercase;">Woodie Representative:</div>
               <div style="font-weight:bold;font-size:10.5px;color:#0f172a;text-transform:uppercase;margin-top:2px;">${escapeHtml(representative)}</div>
               <div style="font-size:9px;color:#475569;">${escapeHtml(repPhone)}</div>
             </div>
-            <div style="text-align:center;">
+            <div style="margin-top:6px;text-align:left;">
               ${signatureImageHtml()}
             </div>
-          </div>
-
-          <div style="flex:1;border:1px dashed #000;padding:8px;text-align:center;height:120px;display:flex;flex-direction:column;justify-content:flex-end;background:#fff;">
-            <div style="font-size:8.5px;color:#64748b;font-weight:bold;text-transform:uppercase;border-top:1px dashed #cbd5e1;padding-top:4px;">
-              Authorized Client Signature &amp; Company Stamp
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top:10px;padding-top:8px;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;font-size:8.5px;">
-          <span style="color:#64748b;">Instant Digital Acceptance:</span>
-          <div style="display:flex;gap:8px;">
-            <a href="https://wa.me/971564226955?text=Hello%20Woodie%2C%20I%20hereby%20accept%20Quotation%20${encodeURIComponent(refNo)}" target="_blank" style="display:inline-flex;align-items:center;gap:3px;background:#25d366;color:#fff;font-weight:bold;padding:3px 8px;border-radius:3px;text-decoration:none;">
-              💬 Confirm on WhatsApp
-            </a>
-            <a href="mailto:info@woodie.ae?subject=Approved%20Quotation%20${encodeURIComponent(refNo)}&body=I%20accept%20Quotation%20${encodeURIComponent(refNo)}%20for%20project%20${encodeURIComponent(subject)}." target="_blank" style="display:inline-flex;align-items:center;gap:3px;background:#0f172a;color:#fff;font-weight:bold;padding:3px 8px;border-radius:3px;text-decoration:none;">
-              ✉️ Confirm via Email
-            </a>
           </div>
         </div>
       </div>
@@ -626,18 +599,69 @@ function resolveSiteBlocks(source) {
   return [];
 }
 
+function cleanLocationAddress(inquiry, boq) {
+  const inq = inquiry || {};
+  const b = boq || {};
+
+  // 1. Get raw candidate text: BOQ edited location has top priority
+  let raw = String(
+    (b.location && String(b.location).trim()) ||
+    inq.fullAddress ||
+    b.siteInformation?.location ||
+    inq.siteDetails ||
+    ""
+  ).trim();
+
+  // If completely empty, fallback to emirates or "Dubai, UAE"
+  if (!raw) {
+    const fallbackEmirates = b.emirates || inq.emirates || inq.state || "Dubai";
+    return fallbackEmirates ? `${fallbackEmirates}, UAE` : "—";
+  }
+
+  // 2. Remove floor-in-detail and internal room/elevator/corridor clutter
+  let cleaned = raw
+    .replace(/\s*(?:>|->|→)\s*/g, ", ")
+    .replace(/\b(?:near|opposite|next to|behind)\s+(?:the\s+)?(?:elevator|lift|stairs|staircase|lobby|reception)\b[^\n,;]*/gi, "")
+    .replace(/\b(?:\d+(?:st|nd|rd|th)?|ground|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|mezzanine|basement)\s+(?:floor|flr|level|lvl)\b/gi, "")
+    .replace(/\b(?:floor|flr|level|lvl)\s*(?:no\.?|#)?\s*\d+\b/gi, "")
+    .replace(/\b(?:room|rm)\s*(?:no\.?|#)?\s*[a-z0-9-]+\b/gi, "")
+    .replace(/[\t ]+/g, " ")
+    .replace(/\s*,\s*,+/g, ",")
+    .replace(/\s*;\s*/g, ", ")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/^[,\s\-:]+/, "")
+    .replace(/[,\s\-:]+$/, "")
+    .trim();
+
+  // If cleaning stripped too much, restore raw without line breaks
+  if (!cleaned || cleaned.length < 3) {
+    cleaned = raw.replace(/[\r\n]+/g, ", ").trim();
+  }
+
+  // 3. Ensure Emirate / City is mentioned in a clean, standard format
+  const emirate = String(b.emirates || inq.emirates || inq.state || "Dubai").trim();
+  const lower = cleaned.toLowerCase();
+  if (emirate && !lower.includes(emirate.toLowerCase()) && !lower.includes("uae") && !lower.includes("united arab emirates")) {
+    cleaned = `${cleaned}, ${emirate}`;
+  }
+
+  return cleaned;
+}
+
 function buildQuotationHtml(boqData, inquiryData) {
   const boq = boqData && typeof boqData.toObject === "function" ? boqData.toObject() : (boqData || {});
   const inquiry = inquiryData && typeof inquiryData.toObject === "function" ? inquiryData.toObject() : (inquiryData || {});
 
-  const quoteDate = boq.updatedAt || boq.createdAt || new Date();
+  const quoteDate = boq.quoteDate || boq.updatedAt || boq.createdAt || new Date();
   const refNo = formatRefNo(boq.quotationNumber, new Date(quoteDate));
   const clientName = boq.clientName || inquiry.clientName || "—";
-  const emirates = inquiry.emirates || inquiry.state || "Dubai";
-  const location = inquiry.fullAddress || inquiry.siteDetails || boq.projectName || "—";
-  const attn = inquiry.attn || inquiry.contactPerson || inquiry.contactPersonName || clientName;
-  const subject = boq.projectName || inquiry.scopeOfWork || "—";
-  const clientRef = inquiry.inquiryNumber || inquiry.clientRefNo || "—";
+  const emirates = boq.emirates || inquiry.emirates || inquiry.state || "Dubai";
+  const location = (boq.location && String(boq.location).trim()) ? cleanLocationAddress(inquiry, boq) : "";
+  const attn = (boq.attn && String(boq.attn).trim()) || "";
+  const subject = (boq.subject && String(boq.subject).trim()) || "";
+  const clientRef = (boq.clientRef && String(boq.clientRef).trim()) || "";
+  const vendorTrn = (boq.vendorTrn && String(boq.vendorTrn).trim()) || "";
+  const projectName = (boq.projectName && String(boq.projectName).trim()) || "";
   const rev = boq.revision != null ? String(boq.revision) : "0";
 
   const sitesFromBoq = boq?.siteInformation?.blocks && boq.siteInformation.blocks.length ? boq.siteInformation.blocks : [];
@@ -698,22 +722,12 @@ function buildQuotationHtml(boqData, inquiryData) {
 
   const body = `
     <div class="quotation-body" style="font-family: Arial, Helvetica, sans-serif;">
-      <div class="interactive-nav" style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border:1px solid #cbd5e1;padding:3px 8px;margin-bottom:8px;font-size:8px;">
-        <span style="font-weight:bold;color:#475569;text-transform:uppercase;letter-spacing:0.04em;">Interactive Sections:</span>
-        <div style="display:flex;gap:10px;">
-          <a href="#section-scope" style="color:#0284c7;font-weight:bold;text-decoration:none;">📋 Scope of Work</a>
-          <a href="#section-financial" style="color:#0284c7;font-weight:bold;text-decoration:none;">💰 Commercial Summary</a>
-          <a href="#section-terms" style="color:#0284c7;font-weight:bold;text-decoration:none;">📜 Terms &amp; Conditions</a>
-          <a href="#section-acceptance" style="color:#0284c7;font-weight:bold;text-decoration:none;">✍️ Client Acceptance</a>
-        </div>
-      </div>
-
       <table class="wts" style="width:100%;border-collapse:collapse;margin-bottom:6px;">
         <tr class="title-row"><td colspan="4" style="background:#FCE4D6;text-align:center;font-weight:bold;font-size:12px;letter-spacing:0.12em;padding:6px;border:1px solid #000;">QUOTATION</td></tr>
         ${metaPair("REF NO", refNo, "Date", formatPdfDate(quoteDate))}
         ${metaPair("CLIENT", clientName, "REV", rev)}
-        ${metaPair("EMIRATES", emirates, "Vendor TRN", COMPANY.trn)}
-        ${metaPair("LOCATION", location, "PROJECT", boq.projectName || "—")}
+        ${metaPair("EMIRATES", emirates, "Vendor TRN", vendorTrn)}
+        ${metaPair("LOCATION", location, "PROJECT", projectName)}
         ${metaPair("ATTN", attn, "CLIENT REF NO", clientRef)}
         <tr>
           <td class="lbl" style="background:#BDD7EE;font-weight:bold;font-size:9px;border:1px solid #000;width:14%;padding:4px 6px;">SUBJECT</td>

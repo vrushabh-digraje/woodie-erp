@@ -52,6 +52,7 @@ export type WorkOrderActivity = {
 
 export type WorkOrder = {
   _id: string;
+  companyId?: string;
   workOrderNumber: string;
   inquiryId: string;
   quotationId: string;

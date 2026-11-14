@@ -1,10 +1,27 @@
 const mongoose = require("mongoose");
 const { TeamMember } = require("../models/TeamMember");
 const { BoqQuotation } = require("../models/BoqQuotation");
-const { canCreateInquiry, isFieldRole, isAdmin, isSales, isManager } = require("../config/rbac");
+const {
+  canCreateInquiry,
+  isFieldRole,
+  isAdmin,
+  isSales,
+  isManager,
+  isMasterAdmin,
+  canApproveVisit,
+  ROLES,
+} = require("../config/rbac");
+const { buildTenantFilter } = require("./tenantIsolation");
 
 function activityActor(req) {
   return req.user?.name || "System";
+}
+
+function matchesCompany(inquiry, member) {
+  if (isMasterAdmin(member.role)) return true;
+  const userCo = (member.companyId || "woodie-1").toLowerCase();
+  const inqCo = (inquiry?.companyId || "woodie-1").toLowerCase();
+  return userCo === inqCo;
 }
 
 function isAssignedToInquiry(inquiry, member) {
@@ -14,6 +31,10 @@ function isAssignedToInquiry(inquiry, member) {
 }
 
 function assertInquiryAccess(inquiry, member, res) {
+  if (!matchesCompany(inquiry, member)) {
+    res.status(403).json({ message: "You do not have access to records from another company" });
+    return false;
+  }
   if (isAdmin(member.role) || isSales(member.role) || isManager(member.role)) return true;
   if (isAssignedToInquiry(inquiry, member)) return true;
   res.status(403).json({ message: "You do not have access to this inquiry" });
@@ -21,8 +42,24 @@ function assertInquiryAccess(inquiry, member, res) {
 }
 
 function assertAssignedPersonAction(inquiry, member, res) {
+  if (!matchesCompany(inquiry, member)) {
+    res.status(403).json({ message: "You do not have access to records from another company" });
+    return false;
+  }
   if (isAssignedToInquiry(inquiry, member)) return true;
   res.status(403).json({ message: "Only the assigned team member can perform this action" });
+  return false;
+}
+
+function assertVisitApprovalAccess(inquiry, member, res) {
+  if (!matchesCompany(inquiry, member)) {
+    res.status(403).json({ message: "You do not have access to records from another company" });
+    return false;
+  }
+  if (canApproveVisit(member.role) || isAssignedToInquiry(inquiry, member)) {
+    return true;
+  }
+  res.status(403).json({ message: "Only Managers, Operation Managers, or assigned engineers can approve site visits" });
   return false;
 }
 
@@ -33,6 +70,10 @@ function assertAssignedPersonAction(inquiry, member, res) {
 async function assertSiteSurveyWriteAccess(inquiry, member, res) {
   if (!inquiry) {
     res.status(404).json({ message: "Inquiry not found" });
+    return false;
+  }
+  if (!matchesCompany(inquiry, member)) {
+    res.status(403).json({ message: "You do not have access to records from another company" });
     return false;
   }
   const status = inquiry.status;
@@ -49,7 +90,7 @@ async function assertSiteSurveyWriteAccess(inquiry, member, res) {
       return false;
     }
   }
-  if (isAssignedToInquiry(inquiry, member)) return true;
+  if (isAssignedToInquiry(inquiry, member) || isAdmin(member.role) || isManager(member.role)) return true;
   res.status(403).json({ message: "Only the assigned site person can edit this site survey" });
   return false;
 }
@@ -69,13 +110,13 @@ async function assertSiteSurveyMediaUpload(inquiry, member, res) {
 function buildInquiryListFilter(req) {
   const { q = "", status = "All" } = req.query;
   const search = String(q).trim();
-  const filter = {};
+  let filter = {};
 
   if (status !== "All") {
     filter.status = status;
   }
 
-  if (isFieldRole(req.user?.role)) {
+  if (isFieldRole(req.user?.role) && !isAdmin(req.user?.role) && !isManager(req.user?.role)) {
     filter.assignedPersonId = req.user._id;
   }
 
@@ -89,22 +130,23 @@ function buildInquiryListFilter(req) {
     ];
   }
 
-  return filter;
+  return buildTenantFilter(req, filter);
 }
 
-async function resolveAssignedPerson(assignedPersonId) {
+async function resolveAssignedPerson(assignedPersonId, companyId) {
   if (!assignedPersonId || !mongoose.Types.ObjectId.isValid(assignedPersonId)) {
     return { error: "A valid assignedPersonId is required" };
   }
-  const person = await TeamMember.findOne({
+  const query = {
     _id: assignedPersonId,
     status: "Active",
-  });
+  };
+  const person = await TeamMember.findOne(query);
   if (!person) {
     return { error: "Assigned person not found or inactive" };
   }
   if (!isFieldRole(person.role)) {
-    return { error: "Assigned person must have a field role (e.g. Site Engineer, Technician)" };
+    return { error: "Assigned person must have a field or engineering role" };
   }
   return { assignedPersonId: person._id, assignedPersonName: person.name };
 }
@@ -119,6 +161,7 @@ module.exports = {
   activityActor,
   assertInquiryAccess,
   assertAssignedPersonAction,
+  assertVisitApprovalAccess,
   assertSiteSurveyWriteAccess,
   assertSiteSurveyMediaUpload,
   buildInquiryListFilter,

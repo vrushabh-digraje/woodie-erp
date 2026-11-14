@@ -11,8 +11,8 @@ function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState("admin@woodie.com");
-  const [password, setPassword] = useState("Admin@123");
+  const [email, setEmail] = useState("master@woodie.com");
+  const [password, setPassword] = useState("master@woodie");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -93,10 +93,11 @@ function LoginPage() {
         </form>
 
         <div className="mt-6 rounded-lg border border-surface-border bg-surface-border-light px-3 py-3 text-xs text-text-muted">
-          <p className="font-medium text-text-secondary">Default admin</p>
-          <p className="mt-1">admin@woodie.com / Admin@123</p>
-          <p className="mt-2">Other users are created in Team by Admin (Active members can sign in).</p>
+          <p className="font-medium text-text-secondary">Master Super Admin</p>
+          <p className="mt-1 font-mono text-slate-800">master@woodie.com / master@woodie</p>
         </div>
+
+
       </div>
     </div>
   );

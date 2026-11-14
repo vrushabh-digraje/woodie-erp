@@ -89,16 +89,12 @@ async function downloadRamsPdf(req, res) {
     const docType = req.body?.docType || req.query?.docType || "combined";
 
     const ramsPayload = {
+      quotation: doc.toObject ? doc.toObject() : doc,
+      inquiry: inquiryData,
       locationName,
       presetKey: req.body?.presetKey || detectedPreset,
       docType,
-      workTypeLower: req.body?.workTypeLower,
-      workTypeCap: req.body?.workTypeCap,
-      hazards: req.body?.hazards,
-      controlMeasures: req.body?.controlMeasures,
-      mosScope: req.body?.mosScope,
-      methodology: req.body?.methodology,
-      safetyPrecautions: req.body?.safetyPrecautions,
+      ...(req.body || {}),
     };
 
     const pdfBuffer = await generateRamsPDF(ramsPayload, docType);

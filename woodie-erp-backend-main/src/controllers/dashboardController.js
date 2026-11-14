@@ -2,8 +2,9 @@ const { Inquiry } = require("../models/Inquiry");
 const { BoqQuotation } = require("../models/BoqQuotation");
 const { Invoice } = require("../models/Invoice");
 const { WorkOrder } = require("../models/WorkOrder");
-const { FIELD_ROLES } = require("../config/rbac");
+const { FIELD_ROLES, COMPANIES, isMasterAdmin } = require("../config/rbac");
 const { AWAITING_STATUSES } = require("../utils/invoiceHelpers");
+const { buildTenantFilter } = require("../middleware/tenantIsolation");
 
 const INACTIVE_WORK_ORDER_STATUSES = ["Completed", "Cancelled", "Handed Over"];
 
@@ -50,10 +51,14 @@ function withAddressMatch(filter, field, location) {
   return { ...filter, [field]: { $regex: rx } };
 }
 
-async function resolveLocationWorkOrderIds(location) {
+async function resolveLocationWorkOrderIds(location, req) {
   if (!location || location === "all") return null;
-  const bySiteFilter = withAddressMatch({}, "siteAddress", location);
-  const inquiryFilter = withAddressMatch({}, "fullAddress", location);
+  let bySiteFilter = withAddressMatch({}, "siteAddress", location);
+  let inquiryFilter = withAddressMatch({}, "fullAddress", location);
+  if (req) {
+    bySiteFilter = buildTenantFilter(req, bySiteFilter);
+    inquiryFilter = buildTenantFilter(req, inquiryFilter);
+  }
   const [bySite, inquiries] = await Promise.all([
     WorkOrder.find(bySiteFilter).select("_id").lean(),
     Inquiry.find(inquiryFilter).select("_id").lean(),
@@ -66,7 +71,7 @@ async function resolveLocationWorkOrderIds(location) {
   return [...bySite, ...byInquiry].map((r) => r._id);
 }
 
-async function buildMonthlyTrend(since, location, workOrderIds) {
+async function buildMonthlyTrend(since, location, workOrderIds, req) {
   const months = 6;
   const now = new Date();
   const buckets = [];
@@ -84,7 +89,7 @@ async function buildMonthlyTrend(since, location, workOrderIds) {
 
   const trend = [];
   for (const b of buckets) {
-    const inquiryFilter = withAddressMatch(
+    let inquiryFilter = withAddressMatch(
       { createdAt: { $gte: b.start, $lt: b.end } },
       "fullAddress",
       location,
@@ -95,113 +100,93 @@ async function buildMonthlyTrend(since, location, workOrderIds) {
     } else {
       woFilter = withAddressMatch(woFilter, "siteAddress", location);
     }
+    if (req) {
+      inquiryFilter = buildTenantFilter(req, inquiryFilter);
+      woFilter = buildTenantFilter(req, woFilter);
+    }
 
     const [inquiries, workOrders] = await Promise.all([
       Inquiry.countDocuments(inquiryFilter),
       WorkOrder.countDocuments(woFilter),
     ]);
-    trend.push({ month: b.month, inquiries, workOrders });
+
+    trend.push({
+      month: b.month,
+      inquiries,
+      workOrders,
+    });
   }
+
   return trend;
 }
 
-async function loadFinanceSummary(extraInvoiceFilter = {}) {
-  const base = { ...extraInvoiceFilter };
-  const [awaitingPayment, escalated, outstandingAgg] = await Promise.all([
-    Invoice.countDocuments({
-      ...base,
-      status: { $in: AWAITING_STATUSES },
-      outstandingBalance: { $gt: 0 },
-    }),
-    Invoice.countDocuments({ ...base, status: "Escalated" }),
+async function loadFinanceSummary(req) {
+  let baseFilter = {};
+  if (req) baseFilter = buildTenantFilter(req);
+
+  const [awaitingAgg, unallocatedAgg, escalatedCount] = await Promise.all([
     Invoice.aggregate([
-      {
-        $match: {
-          ...base,
-          outstandingBalance: { $gt: 0 },
-          status: { $ne: "Cancelled" },
-        },
-      },
+      { $match: { ...baseFilter, status: { $in: AWAITING_STATUSES } } },
       { $group: { _id: null, total: { $sum: "$outstandingBalance" } } },
     ]),
+    Invoice.aggregate([
+      { $match: { ...baseFilter, status: "Awaiting Payment", paidAmount: 0 } },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    Invoice.countDocuments({ ...baseFilter, status: "Escalated" }),
   ]);
+
   return {
-    awaitingPayment,
-    escalatedInvoices: escalated,
-    totalOutstanding: outstandingAgg[0]?.total ?? 0,
+    totalAwaitingBalance: awaitingAgg[0]?.total ?? 0,
+    unallocatedCollections: unallocatedAgg[0]?.total ?? 0,
+    escalatedCount,
   };
 }
 
-async function adminStats(_req, res) {
-  const [total, byStatus, pendingApproval, visitApproved, visitRejected, readyForBoq, boqByStatus] =
-    await Promise.all([
-      Inquiry.countDocuments(),
-      Inquiry.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
-      Inquiry.countDocuments({ status: "Visit Pending Approval" }),
-      Inquiry.countDocuments({ status: "Visit Approved" }),
-      Inquiry.countDocuments({ status: "Visit Rejected" }),
-      Inquiry.countDocuments({ status: "Site Report Attached" }),
-      BoqQuotation.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
-    ]);
-
-  const statusMap = Object.fromEntries(byStatus.map((row) => [row._id, row.count]));
-  const boqMap = Object.fromEntries(boqByStatus.map((row) => [row._id, row.count]));
-  const finance = await loadFinanceSummary();
-
-  return res.json({
-    role: "admin",
-    finance,
-    totalInquiries: total,
-    pendingApproval,
-    visitApproved,
-    visitRejected,
-    reportsAttached: readyForBoq,
-    readyForBoq,
-    inquiryByStatus: statusMap,
-    boqByStatus: boqMap,
-    boqTotal: Object.values(boqMap).reduce((sum, n) => sum + n, 0),
-    pendingBoqApproval: boqMap["Pending Approval"] ?? 0,
-  });
+async function adminStats(req, res) {
+  const filters = parseDashboardFilters(req.query);
+  const payload = await buildOfficeDashboardPayload("admin", filters, req);
+  return res.json(payload);
 }
 
-async function salesStats(_req, res) {
-  const [total, byStatus, boqByStatus] = await Promise.all([
-    Inquiry.countDocuments(),
-    Inquiry.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
-    BoqQuotation.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+async function salesStats(req, res) {
+  const memberId = req.user._id;
+  const filter = buildTenantFilter(req, { assignedPersonId: memberId });
+
+  const [assigned, won, lost, pendingApproval, completed] = await Promise.all([
+    Inquiry.countDocuments(filter),
+    Inquiry.countDocuments({ ...filter, status: "Won" }),
+    Inquiry.countDocuments({ ...filter, status: "Lost" }),
+    Inquiry.countDocuments({ ...filter, status: "Visit Pending Approval" }),
+    Inquiry.countDocuments({ ...filter, status: "Site Report Attached" }),
   ]);
 
-  const inquiryMap = Object.fromEntries(byStatus.map((row) => [row._id, row.count]));
-  const boqMap = Object.fromEntries(boqByStatus.map((row) => [row._id, row.count]));
-  const finance = await loadFinanceSummary();
+  const finance = await loadFinanceSummary(req);
 
   return res.json({
     role: "sales",
     finance,
-    totalInquiries: total,
-    pendingApproval: inquiryMap["Visit Pending Approval"] ?? 0,
-    visitApproved: inquiryMap["Visit Approved"] ?? 0,
-    visitRejected: inquiryMap["Visit Rejected"] ?? 0,
-    reportsAttached: inquiryMap["Site Report Attached"] ?? 0,
-    inquiryByStatus: inquiryMap,
-    boqByStatus: boqMap,
-    boqTotal: Object.values(boqMap).reduce((sum, n) => sum + n, 0),
+    myInquiries: assigned,
+    wonDeals: won,
+    lostDeals: lost,
+    pendingVisits: pendingApproval,
+    completedVisits: completed,
   });
 }
 
 async function fieldStats(req, res) {
   const memberId = req.user._id;
-  const filter = { assignedPersonId: memberId };
+  const filter = buildTenantFilter(req, { assignedPersonId: memberId });
 
-  const [assigned, pendingApproval, inProgress, completed, rejected] = await Promise.all([
+  const [assigned, inProgress, completed, rejected, pendingApproval] = await Promise.all([
+    Inquiry.countDocuments(filter),
     Inquiry.countDocuments({
       ...filter,
-      status: { $in: ["Visit Pending Approval", "Visit Approved", "Site Report Attached"] },
+      status: { $in: ["Visit Approved", "Visit Pending Approval"] },
     }),
-    Inquiry.countDocuments({ ...filter, status: "Visit Pending Approval" }),
-    Inquiry.countDocuments({ ...filter, status: "Visit Approved" }),
     Inquiry.countDocuments({ ...filter, status: "Site Report Attached" }),
     Inquiry.countDocuments({ ...filter, status: "Visit Rejected" }),
+    Inquiry.countDocuments({ ...filter, status: "Visit Pending Approval" }),
   ]);
 
   return res.json({
@@ -214,21 +199,23 @@ async function fieldStats(req, res) {
   });
 }
 
-async function managerStats(_req, res) {
+async function managerStats(req, res) {
+  const tenantScope = buildTenantFilter(req);
   const [pending, approved, rejected, inProgress, boqByStatus, inquiryByStatus] = await Promise.all([
-    BoqQuotation.countDocuments({ status: "Pending Approval" }),
-    BoqQuotation.countDocuments({ status: "Approved" }),
-    BoqQuotation.countDocuments({ status: "Rejected" }),
+    BoqQuotation.countDocuments({ ...tenantScope, status: "Pending Approval" }),
+    BoqQuotation.countDocuments({ ...tenantScope, status: "Approved" }),
+    BoqQuotation.countDocuments({ ...tenantScope, status: "Rejected" }),
     BoqQuotation.countDocuments({
+      ...tenantScope,
       status: { $in: ["BOQ In Progress", "Quotation Draft", "Revision Requested", "Rejected"] },
     }),
-    BoqQuotation.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
-    Inquiry.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+    BoqQuotation.aggregate([{ $match: tenantScope }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
+    Inquiry.aggregate([{ $match: tenantScope }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
   ]);
 
   const boqMap = Object.fromEntries(boqByStatus.map((row) => [row._id, row.count]));
   const inquiryMap = Object.fromEntries(inquiryByStatus.map((row) => [row._id, row.count]));
-  const finance = await loadFinanceSummary();
+  const finance = await loadFinanceSummary(req);
 
   return res.json({
     role: "manager",
@@ -243,12 +230,13 @@ async function managerStats(_req, res) {
   });
 }
 
-async function buildOfficeDashboardPayload(roleKey, filters) {
+async function buildOfficeDashboardPayload(roleKey, filters, req) {
   const { location, since } = filters;
-  const workOrderIds = await resolveLocationWorkOrderIds(location);
+  const workOrderIds = await resolveLocationWorkOrderIds(location, req);
 
   let inquiryFilter = withCreatedSince({}, since);
   inquiryFilter = withAddressMatch(inquiryFilter, "fullAddress", location);
+  if (req) inquiryFilter = buildTenantFilter(req, inquiryFilter);
 
   let woActiveFilter = { status: { $nin: INACTIVE_WORK_ORDER_STATUSES } };
   if (workOrderIds) {
@@ -256,6 +244,7 @@ async function buildOfficeDashboardPayload(roleKey, filters) {
   } else {
     woActiveFilter = withAddressMatch(woActiveFilter, "siteAddress", location);
   }
+  if (req) woActiveFilter = buildTenantFilter(req, woActiveFilter);
 
   let invoiceFilter = withCreatedSince({}, since);
   if (workOrderIds) {
@@ -266,6 +255,7 @@ async function buildOfficeDashboardPayload(roleKey, filters) {
       workOrderId: { $in: workOrderIds && workOrderIds.length ? workOrderIds : [] },
     };
   }
+  if (req) invoiceFilter = buildTenantFilter(req, invoiceFilter);
 
   const [
     totalInquiries,
@@ -299,7 +289,7 @@ async function buildOfficeDashboardPayload(roleKey, filters) {
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]),
     getRecentActivity(5),
-    buildMonthlyTrend(since, location, workOrderIds),
+    buildMonthlyTrend(since, location, workOrderIds, req),
   ]);
 
   const inquiryPipeline = Object.fromEntries(
@@ -318,10 +308,9 @@ async function buildOfficeDashboardPayload(roleKey, filters) {
     outstandingInvoicesAmount: outstandingAgg[0]?.total ?? 0,
     escalatedInvoices,
     inquiryPipeline,
-    invoiceStatusBreakdown: invoiceStatusBreakdown.map((row) => ({
-      status: row._id,
-      count: row.count,
-    })),
+    invoiceStatusBreakdown: Object.fromEntries(
+      invoiceStatusBreakdown.map((row) => [row._id, row.count]),
+    ),
     monthlyTrend,
     recentActivity,
   };
@@ -329,110 +318,67 @@ async function buildOfficeDashboardPayload(roleKey, filters) {
 
 async function getDashboardStats(req, res) {
   try {
-    const role = req.user?.role ?? "admin";
     const filters = parseDashboardFilters(req.query);
 
-    if (role === "admin" || role === "manager" || role === "procurement" || role === "accounts") {
-      const roleKey = role === "admin" ? "admin" : "manager";
-      return res.json(await buildOfficeDashboardPayload(roleKey, filters));
+    if (isMasterAdmin(req.user.role)) {
+      return masterStats(req, res);
     }
 
-    if (role === "sales") {
-      const userId = req.user._id;
-      const monthStart = startOfMonth();
-      let inquiryMatch = withCreatedSince({ createdBy: userId }, filters.since);
-      inquiryMatch = withAddressMatch(inquiryMatch, "fullAddress", filters.location);
-
-      const [myInquiryRows, myBoqRows, pendingApprovals, wonThisMonth, recentActivity, monthlyTrend] =
-        await Promise.all([
-          Inquiry.aggregate([
-            { $match: inquiryMatch },
-            { $group: { _id: "$status", count: { $sum: 1 } } },
-          ]),
-          BoqQuotation.aggregate([
-            {
-              $match: withCreatedSince({ createdBy: userId }, filters.since),
-            },
-            { $group: { _id: "$status", count: { $sum: 1 } } },
-          ]),
-          BoqQuotation.countDocuments({
-            createdBy: userId,
-            status: "Pending Approval",
-            ...(filters.since ? { createdAt: { $gte: filters.since } } : {}),
-          }),
-          Inquiry.countDocuments({
-            ...inquiryMatch,
-            status: "Won",
-            updatedAt: { $gte: monthStart },
-          }),
-          getRecentActivity(5),
-          buildMonthlyTrend(filters.since, filters.location, null),
-        ]);
-
-      const myInquiriesByStatus = Object.fromEntries(
-        myInquiryRows.map((row) => [row._id, row.count]),
-      );
-      const myQuotationsByStatus = Object.fromEntries(
-        myBoqRows.map((row) => [row._id, row.count]),
-      );
-
-      return res.json({
-        role: "sales",
-        filters: {
-          period: filters.period,
-          location: filters.location,
-          locations: LOCATION_OPTIONS,
-        },
-        myInquiriesByStatus,
-        myQuotationsByStatus,
-        pendingApprovals,
-        wonThisMonth,
-        monthlyTrend,
-        recentActivity,
-      });
+    if (req.user.role === "admin") {
+      return res.json(await buildOfficeDashboardPayload("admin", filters, req));
     }
 
-    if (FIELD_ROLES.includes(role)) {
+    if (req.user.role === "manager" || req.user.role === "operation_manager" || req.user.role === "procurement") {
+      return res.json(await buildOfficeDashboardPayload("manager", filters, req));
+    }
+
+    if (req.user.role === "sales" || req.user.role === "accounts") {
+      return salesStats(req, res);
+    }
+
+    if (FIELD_ROLES.includes(req.user.role)) {
       const memberId = req.user._id;
-      const monthStart = startOfMonth();
-      let visitBase = withCreatedSince({ assignedPersonId: memberId }, filters.since);
-      visitBase = withAddressMatch(visitBase, "fullAddress", filters.location);
+      const startOfThisMonth = startOfMonth();
+      const scopedMember = buildTenantFilter(req, { assignedPersonId: memberId });
+      const scopedTeam = buildTenantFilter(req, { "assignedTeam.memberId": memberId });
 
-      const [pendingVisits, approvedVisits, completedVisits, myActiveWorkOrders, completedThisMonth, recentActivity] =
-        await Promise.all([
-          Inquiry.countDocuments({
-            ...visitBase,
-            status: "Visit Pending Approval",
-          }),
-          Inquiry.countDocuments({
-            ...visitBase,
-            status: "Visit Approved",
-          }),
-          Inquiry.countDocuments({
-            ...visitBase,
-            status: "Site Report Attached",
-          }),
-          WorkOrder.countDocuments({
-            "assignedTeam.memberId": memberId,
-            status: "In Progress",
-            ...(filters.since ? { createdAt: { $gte: filters.since } } : {}),
-            ...(locationRegex(filters.location)
-              ? { siteAddress: { $regex: locationRegex(filters.location) } }
-              : {}),
-          }),
-          WorkOrder.countDocuments({
-            "assignedTeam.memberId": memberId,
-            status: "Completed",
-            updatedAt: { $gte: monthStart },
-          }),
-          getRecentActivity(5),
-        ]);
-
-      const openSnagRows = await WorkOrder.aggregate([
-        { $match: { "assignedTeam.memberId": memberId } },
-        { $unwind: "$snags" },
-        { $match: { "snags.status": "open" } },
-        { $count: "count" },
+      const [
+        pendingVisits,
+        approvedVisits,
+        completedVisits,
+        myActiveWorkOrders,
+        completedThisMonth,
+        openSnagRows,
+        recentActivity,
+      ] = await Promise.all([
+        Inquiry.countDocuments({
+          ...scopedMember,
+          status: "Visit Pending Approval",
+        }),
+        Inquiry.countDocuments({
+          ...scopedMember,
+          status: "Visit Approved",
+        }),
+        Inquiry.countDocuments({
+          ...scopedMember,
+          status: "Site Report Attached",
+        }),
+        WorkOrder.countDocuments({
+          ...scopedTeam,
+          status: { $nin: INACTIVE_WORK_ORDER_STATUSES },
+        }),
+        WorkOrder.countDocuments({
+          ...scopedTeam,
+          status: "Completed",
+          updatedAt: { $gte: startOfThisMonth },
+        }),
+        WorkOrder.aggregate([
+          { $match: { ...scopedTeam, "snags.status": "open" } },
+          { $unwind: "$snags" },
+          { $match: { "snags.status": "open" } },
+          { $count: "count" },
+        ]),
+        getRecentActivity(5),
       ]);
 
       return res.json({
@@ -454,9 +400,281 @@ async function getDashboardStats(req, res) {
       });
     }
 
-    return res.json(await buildOfficeDashboardPayload("admin", filters));
+    return res.json(await buildOfficeDashboardPayload("admin", filters, req));
   } catch (error) {
     return res.status(500).json({ message: error.message || "Failed to load dashboard stats" });
+  }
+}
+
+/**
+ * Master Super-Admin Dashboard Stats:
+ * Aggregates high-level metrics across all companies or filters by specified company.
+ */
+async function masterStats(req, res) {
+  try {
+    const filters = parseDashboardFilters(req.query);
+    const { since, location } = filters;
+    const requestedCompany = (req.query.companyId || req.query.company || req.headers?.["x-company-id"] || req.companyId || "all").toString().toLowerCase().trim();
+    const companyFilter = requestedCompany === "all" ? "all" : requestedCompany;
+
+    let tenantScope = {};
+    if (companyFilter !== "all") {
+      if (companyFilter === "woodie-1") {
+        tenantScope = { $or: [{ companyId: "woodie-1" }, { companyId: { $exists: false } }, { companyId: null }] };
+      } else {
+        tenantScope = { companyId: companyFilter };
+      }
+    }
+
+    let inqFilter = { ...tenantScope };
+    if (since) inqFilter = withCreatedSince(inqFilter, since);
+    inqFilter = withAddressMatch(inqFilter, "fullAddress", location);
+
+    let quotFilter = { ...tenantScope };
+    if (since) quotFilter = withCreatedSince(quotFilter, since);
+
+    let woFilter = { ...tenantScope };
+    if (since) woFilter = withCreatedSince(woFilter, since);
+    woFilter = withAddressMatch(woFilter, "siteAddress", location);
+
+    let invFilter = { ...tenantScope };
+    if (since) invFilter = withCreatedSince(invFilter, since);
+
+    const [
+      totalInquiries,
+      inquiryByStatusRaw,
+      totalQuotations,
+      quotationByStatusRaw,
+      quotationValueAgg,
+      totalWorkOrders,
+      workOrdersByStatusRaw,
+      invoiceValueAgg,
+      recentActivity,
+    ] = await Promise.all([
+      Inquiry.countDocuments(inqFilter),
+      Inquiry.aggregate([
+        { $match: inqFilter },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
+      BoqQuotation.countDocuments(quotFilter),
+      BoqQuotation.aggregate([
+        { $match: quotFilter },
+        { $group: { _id: "$status", count: { $sum: 1 }, totalValue: { $sum: "$grandTotal" } } },
+      ]),
+      BoqQuotation.aggregate([
+        { $match: quotFilter },
+        { $group: { _id: null, total: { $sum: "$grandTotal" } } },
+      ]),
+      WorkOrder.countDocuments(woFilter),
+      WorkOrder.aggregate([
+        { $match: woFilter },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
+      Invoice.aggregate([
+        { $match: invFilter },
+        { $group: { _id: null, totalAmount: { $sum: "$totalAmount" }, paidAmount: { $sum: "$paidAmount" } } },
+      ]),
+      getRecentActivity(8),
+    ]);
+
+    const inquiryByStatus = Object.fromEntries(inquiryByStatusRaw.map((r) => [r._id, r.count]));
+    const quotationByStatus = Object.fromEntries(quotationByStatusRaw.map((r) => [r._id, r.count]));
+    const workOrdersByStatus = Object.fromEntries(workOrdersByStatusRaw.map((r) => [r._id, r.count]));
+
+    // Multi-Company comparison breakdown
+    const companyComparison = await Promise.all(
+      COMPANIES.map(async (company) => {
+        const cScope = company.id === "woodie-1"
+          ? { $or: [{ companyId: "woodie-1" }, { companyId: { $exists: false } }, { companyId: null }] }
+          : { companyId: company.id };
+
+        const [inqCount, quotRows, woRows, invRows] = await Promise.all([
+          Inquiry.countDocuments(cScope),
+          BoqQuotation.aggregate([
+            { $match: cScope },
+            { $group: { _id: null, count: { $sum: 1 }, totalValue: { $sum: "$grandTotal" } } },
+          ]),
+          WorkOrder.aggregate([
+            { $match: cScope },
+            {
+              $group: {
+                _id: null,
+                total: { $sum: 1 },
+                active: {
+                  $sum: {
+                    $cond: [{ $in: ["$status", ["Scheduled", "In Progress", "Snagging"]] }, 1, 0],
+                  },
+                },
+              },
+            },
+          ]),
+          Invoice.aggregate([
+            { $match: cScope },
+            { $group: { _id: null, totalPaid: { $sum: "$paidAmount" }, totalBilled: { $sum: "$totalAmount" } } },
+          ]),
+        ]);
+
+        return {
+          id: company.id,
+          name: company.name,
+          inquiries: inqCount,
+          quotations: quotRows[0]?.count || 0,
+          quotationValue: Math.round((quotRows[0]?.totalValue || 0) * 100) / 100,
+          workOrders: woRows[0]?.total || 0,
+          activeWorkOrders: woRows[0]?.active || 0,
+          revenue: Math.round((invRows[0]?.totalPaid || 0) * 100) / 100,
+        };
+      }),
+    );
+
+    const activeWorkOrders =
+      (workOrdersByStatus["Scheduled"] || 0) +
+      (workOrdersByStatus["In Progress"] || 0) +
+      (workOrdersByStatus["Snagging"] || 0) +
+      (workOrdersByStatus["On Hold"] || 0);
+
+    return res.json({
+      role: "master_admin",
+      companyFilter,
+      companies: COMPANIES,
+      summary: {
+        totalInquiries,
+        totalSiteVisits:
+          (inquiryByStatus["Visit Pending Approval"] || 0) +
+          (inquiryByStatus["Visit Approved"] || 0) +
+          (inquiryByStatus["Site Report Attached"] || 0) +
+          (inquiryByStatus["Visit Rejected"] || 0),
+        pendingVisits: inquiryByStatus["Visit Pending Approval"] || 0,
+        approvedVisits: inquiryByStatus["Visit Approved"] || 0,
+        completedVisits: inquiryByStatus["Site Report Attached"] || 0,
+        totalQuotations,
+        pendingApprovalQuotations: quotationByStatus["Pending Approval"] || 0,
+        approvedQuotations: quotationByStatus["Approved"] || 0,
+        wonQuotations: quotationByStatus["Won"] || 0,
+        quotationValueAed: Math.round((quotationValueAgg[0]?.total || 0) * 100) / 100,
+        totalWorkOrders,
+        activeWorkOrders,
+        completedWorkOrders: workOrdersByStatus["Completed"] || 0,
+        totalInvoicedAed: Math.round((invoiceValueAgg[0]?.totalAmount || 0) * 100) / 100,
+        totalPaidAed: Math.round((invoiceValueAgg[0]?.paidAmount || 0) * 100) / 100,
+      },
+      inquiryByStatus,
+      siteVisitBreakdown: {
+        "Pending Approval": inquiryByStatus["Visit Pending Approval"] || 0,
+        "Approved / Scheduled": inquiryByStatus["Visit Approved"] || 0,
+        "Completed / Report Attached": inquiryByStatus["Site Report Attached"] || 0,
+        "Rejected": inquiryByStatus["Visit Rejected"] || 0,
+      },
+      quotationByStatus,
+      workOrdersByStatus,
+      companyComparison,
+      recentActivity,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message || "Failed to load master dashboard stats" });
+  }
+}
+
+/**
+ * Interactive Drill-Down API:
+ * Returns the live underlying records for a specific chart segment.
+ */
+async function masterDrilldown(req, res) {
+  try {
+    const { category = "inquiries", status = "all", companyId = "all" } = req.query;
+
+    let tenantScope = {};
+    if (companyId && companyId !== "all") {
+      if (companyId === "woodie-1") {
+        tenantScope = { $or: [{ companyId: "woodie-1" }, { companyId: { $exists: false } }, { companyId: null }] };
+      } else {
+        tenantScope = { companyId };
+      }
+    } else if (!isMasterAdmin(req.user.role)) {
+      tenantScope = buildTenantFilter(req);
+    }
+
+    const companyNameForId = (cid) => {
+      const found = COMPANIES.find((c) => c.id === cid);
+      return found ? found.name : "Woodie 1";
+    };
+
+    let records = [];
+
+    if (category === "inquiries" || category === "visits") {
+      const filter = { ...tenantScope };
+      if (status && status !== "all") {
+        if (category === "visits") {
+          if (status === "Pending Approval") filter.status = "Visit Pending Approval";
+          else if (status === "Approved / Scheduled") filter.status = "Visit Approved";
+          else if (status === "Completed / Report Attached") filter.status = "Site Report Attached";
+          else if (status === "Rejected") filter.status = "Visit Rejected";
+          else filter.status = status;
+        } else {
+          filter.status = status;
+        }
+      }
+      const docs = await Inquiry.find(filter).sort({ createdAt: -1 }).limit(50).lean();
+      records = docs.map((doc) => ({
+        id: doc._id,
+        number: doc.inquiryNumber,
+        projectName: doc.scopeOfWork || "Site Visit",
+        clientName: doc.clientName,
+        assignedPerson: doc.assignedPersonName,
+        status: doc.status,
+        companyId: doc.companyId || "woodie-1",
+        companyName: companyNameForId(doc.companyId || "woodie-1"),
+        date: doc.scheduleVisitDate || doc.createdAt,
+        time: doc.scheduleVisitTime || "",
+        link: `/inquiry/inquiries/${doc._id}`,
+      }));
+    } else if (category === "quotations") {
+      const filter = { ...tenantScope };
+      if (status && status !== "all") {
+        filter.status = status;
+      }
+      const docs = await BoqQuotation.find(filter).sort({ updatedAt: -1 }).limit(50).lean();
+      records = docs.map((doc) => ({
+        id: doc._id,
+        number: doc.quotationNumber,
+        projectName: doc.projectName || "Quotation",
+        clientName: doc.clientName,
+        status: doc.status,
+        value: doc.grandTotal || 0,
+        companyId: doc.companyId || "woodie-1",
+        companyName: companyNameForId(doc.companyId || "woodie-1"),
+        date: doc.quoteDate || doc.createdAt,
+        link: `/boq/${doc._id}`,
+      }));
+    } else if (category === "workorders") {
+      const filter = { ...tenantScope };
+      if (status && status !== "all") {
+        filter.status = status;
+      }
+      const docs = await WorkOrder.find(filter).sort({ updatedAt: -1 }).limit(50).lean();
+      records = docs.map((doc) => ({
+        id: doc._id,
+        number: doc.workOrderNumber,
+        projectName: doc.projectName || "Work Order",
+        clientName: doc.clientName,
+        status: doc.status,
+        value: doc.approvedAmount || 0,
+        companyId: doc.companyId || "woodie-1",
+        companyName: companyNameForId(doc.companyId || "woodie-1"),
+        date: doc.scheduledStart || doc.createdAt,
+        link: `/workorders/${doc._id}`,
+      }));
+    }
+
+    return res.json({
+      category,
+      status,
+      companyId,
+      total: records.length,
+      records,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message || "Failed to fetch drill-down records" });
   }
 }
 
@@ -511,4 +729,6 @@ module.exports = {
   fieldStats,
   managerStats,
   getDashboardStats,
+  masterStats,
+  masterDrilldown,
 };

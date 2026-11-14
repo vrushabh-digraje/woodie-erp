@@ -113,6 +113,8 @@ const siteScopeSchema = new mongoose.Schema(
 const inquirySchema = new mongoose.Schema(
   {
     inquiryNumber: { type: String, required: true, unique: true, trim: true },
+    companyId: { type: String, default: "woodie-1", index: true },
+    clientRefNo: { type: String, trim: true, default: "" },
     clientName: { type: String, required: true, trim: true },
     contactPersonName: { type: String, trim: true, default: "" },
     phone: { type: String, required: true, trim: true },

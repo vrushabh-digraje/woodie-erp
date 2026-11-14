@@ -51,15 +51,28 @@ export function barChartFromStatusMap(
 }
 
 export function pieChartFromBreakdown(
-  rows: { status: string; count: number }[] | undefined,
+  rows: { status: string; count: number }[] | Record<string, number> | undefined,
 ): { name: string; value: number; fill: string }[] {
-  return (rows ?? [])
-    .filter((row) => row.count > 0)
-    .map((row, index) => ({
-      name: row.status,
-      value: row.count,
-      fill: INVOICE_PALETTE[index % INVOICE_PALETTE.length],
-    }));
+  if (!rows) return [];
+  if (Array.isArray(rows)) {
+    return rows
+      .filter((row) => row && typeof row.count === "number" && row.count > 0)
+      .map((row, index) => ({
+        name: row.status,
+        value: row.count,
+        fill: INVOICE_PALETTE[index % INVOICE_PALETTE.length],
+      }));
+  }
+  if (typeof rows === "object") {
+    return Object.entries(rows)
+      .filter(([, count]) => typeof count === "number" && count > 0)
+      .map(([status, count], index) => ({
+        name: status,
+        value: count,
+        fill: INVOICE_PALETTE[index % INVOICE_PALETTE.length],
+      }));
+  }
+  return [];
 }
 
 export const FIELD_VISIT_CHART = [

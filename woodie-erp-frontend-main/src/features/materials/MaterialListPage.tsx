@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Package, Plus, Search } from "lucide-react";
+import { useAuth } from "../auth/AuthContext";
 import {
   DataTable,
   DataTableBody,
@@ -41,6 +42,7 @@ const emptyForm: MaterialForm = {
 };
 
 export function MaterialInventorySection() {
+  const { activeCompany } = useAuth();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -61,7 +63,7 @@ export function MaterialInventorySection() {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, activeCompany]);
 
   useEffect(() => {
     void load();
@@ -181,6 +183,19 @@ export function MaterialInventorySection() {
                 <div key={m._id} className="rounded-xl border border-surface-border-light p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div>
+                      {m.companyId && (
+                        <span
+                          className={`mb-1 inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold border ${
+                            m.companyId === "woodie-2"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : m.companyId === "woodie-3"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : "bg-blue-50 text-blue-800 border-blue-200"
+                          }`}
+                        >
+                          {m.companyId === "woodie-2" ? "Woodie 2" : m.companyId === "woodie-3" ? "Woodie 3" : "Woodie 1"}
+                        </span>
+                      )}
                       <p className="font-medium">{m.name}</p>
                       <p className="font-mono text-xs text-text-muted">{m.SKU}</p>
                     </div>
@@ -215,6 +230,7 @@ export function MaterialInventorySection() {
               <DataTable>
                 <DataTableHeader>
                   <DataTableHeadRow>
+                    <DataTableTh>Company</DataTableTh>
                     <DataTableTh>SKU</DataTableTh>
                     <DataTableTh>Name</DataTableTh>
                     <DataTableTh>Unit</DataTableTh>
@@ -228,6 +244,19 @@ export function MaterialInventorySection() {
                 <DataTableBody>
                   {materials.map((m) => (
                     <DataTableRow key={m._id}>
+                      <DataTableTd className="whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold border ${
+                            m.companyId === "woodie-2"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : m.companyId === "woodie-3"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : "bg-blue-50 text-blue-800 border-blue-200"
+                          }`}
+                        >
+                          {m.companyId === "woodie-2" ? "Woodie 2" : m.companyId === "woodie-3" ? "Woodie 3" : "Woodie 1"}
+                        </span>
+                      </DataTableTd>
                       <DataTableTd className="font-mono text-xs">{m.SKU}</DataTableTd>
                       <DataTableTd className="font-medium">{m.name}</DataTableTd>
                       <DataTableTd>{m.unit}</DataTableTd>

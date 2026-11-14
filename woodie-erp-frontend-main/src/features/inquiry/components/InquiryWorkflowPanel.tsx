@@ -9,7 +9,7 @@ export default function InquiryWorkflowPanel({ status }: InquiryWorkflowPanelPro
   const steps = [
     { label: "Created", done: true, rejected: false },
     {
-      label: status === "Visit Rejected" ? "Rejected" : "Approved",
+      label: status === "Visit Rejected" ? "Rejected" : "Accepted",
       done: status !== "Visit Pending Approval",
       rejected: status === "Visit Rejected",
     },

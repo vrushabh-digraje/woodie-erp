@@ -3,6 +3,7 @@ const fs = require("fs");
 const { WorkOrder, WORK_ORDER_STATUSES } = require("../models/WorkOrder");
 const { TeamMember } = require("../models/TeamMember");
 const { isFieldRole } = require("../config/rbac");
+const { buildTenantFilter } = require("../middleware/tenantIsolation");
 const {
   assertWorkOrderReadAccess,
   assertWorkOrderManageAccess,
@@ -96,8 +97,9 @@ async function listWorkOrders(req, res) {
     const pageParam = Number(req.query?.page);
     const pageSizeParam = Number(req.query?.pageSize);
     const usePagination = Number.isFinite(pageParam) && pageParam > 0;
+    const scopedFilter = buildTenantFilter(req, filter);
     if (!usePagination) {
-      const data = await WorkOrder.find(filter).sort({ updatedAt: -1 });
+      const data = await WorkOrder.find(scopedFilter).sort({ updatedAt: -1 });
       return res.json(data);
     }
 
@@ -105,8 +107,8 @@ async function listWorkOrders(req, res) {
     const pageSize = Math.min(100, Math.max(1, Math.floor(pageSizeParam || 20)));
     const skip = (page - 1) * pageSize;
     const [items, total] = await Promise.all([
-      WorkOrder.find(filter).sort({ updatedAt: -1 }).skip(skip).limit(pageSize),
-      WorkOrder.countDocuments(filter),
+      WorkOrder.find(scopedFilter).sort({ updatedAt: -1 }).skip(skip).limit(pageSize),
+      WorkOrder.countDocuments(scopedFilter),
     ]);
     return res.json({
       items,

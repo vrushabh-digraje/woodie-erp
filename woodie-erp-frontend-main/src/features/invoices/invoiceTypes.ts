@@ -32,6 +32,7 @@ export type InvoiceActivity = {
 
 export type Invoice = {
   _id: string;
+  companyId?: string;
   invoiceNumber: string;
   type: InvoiceType;
   status: InvoiceStatus;

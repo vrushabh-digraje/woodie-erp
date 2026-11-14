@@ -4,6 +4,7 @@ const { BoqQuotation } = require("../models/BoqQuotation");
 const { Inquiry } = require("../models/Inquiry");
 const { openSnagCount } = require("../middleware/workOrderAccess");
 const { generateInvoicePDF } = require("../utils/generateInvoicePdf");
+const { buildTenantFilter } = require("../middleware/tenantIsolation");
 const {
   generateInvoiceNumber,
   applyInvoiceAmounts,
@@ -38,8 +39,9 @@ async function listInvoices(req, res) {
     const pageParam = Number(req.query?.page);
     const pageSizeParam = Number(req.query?.pageSize);
     const usePagination = Number.isFinite(pageParam) && pageParam > 0;
+    const scopedFilter = buildTenantFilter(req, filter);
     if (!usePagination) {
-      const rows = await Invoice.find(filter).sort({ updatedAt: -1 }).limit(500);
+      const rows = await Invoice.find(scopedFilter).sort({ updatedAt: -1 }).limit(500);
       return res.json(rows);
     }
 
@@ -47,8 +49,8 @@ async function listInvoices(req, res) {
     const pageSize = Math.min(100, Math.max(1, Math.floor(pageSizeParam || 20)));
     const skip = (page - 1) * pageSize;
     const [items, total] = await Promise.all([
-      Invoice.find(filter).sort({ updatedAt: -1 }).skip(skip).limit(pageSize),
-      Invoice.countDocuments(filter),
+      Invoice.find(scopedFilter).sort({ updatedAt: -1 }).skip(skip).limit(pageSize),
+      Invoice.countDocuments(scopedFilter),
     ]);
     return res.json({
       items,
@@ -176,6 +178,7 @@ async function createInvoice(req, res) {
     const invoiceNumber = await generateInvoiceNumber();
     const doc = new Invoice({
       invoiceNumber,
+      companyId: wo.companyId || (req.companyId || "woodie-1"),
       type,
       status: "Draft",
       workOrderId: wo._id,

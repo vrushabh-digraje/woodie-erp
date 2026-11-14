@@ -125,14 +125,14 @@ function InquiryDetailsPage() {
 
               {showApproval ? (
                 <article className="app-card p-5">
-                  <h3 className="mb-3 font-semibold">Approve or reject visit</h3>
+                  <h3 className="mb-3 font-semibold">Accept or reject visit</h3>
                   <form onSubmit={handleApproval} className="space-y-3">
                     <select
                       value={approvalDecision}
                       onChange={(e) => setApprovalDecision(e.target.value as VisitApprovalDecision)}
                       className="mr-2 rounded-xl border border-slate-200 px-3 py-2 text-sm"
                     >
-                      <option value="Approved">Approve visit</option>
+                      <option value="Approved">Accept visit</option>
                       <option value="Rejected">Reject visit</option>
                     </select>
                     {approvalDecision === "Rejected" ? (

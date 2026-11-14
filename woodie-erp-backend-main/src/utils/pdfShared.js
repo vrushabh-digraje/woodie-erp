@@ -103,8 +103,15 @@ function formatMoneyNum(amount) {
 }
 
 function formatRefNo(quotationNumber, date = new Date()) {
-  const digits = String(quotationNumber || "").replace(/\D/g, "") || "0";
-  return `QTY/WTS${digits}/${date.getFullYear()}`;
+  const str = String(quotationNumber || "").trim();
+  if (/^QTY\/WTS\d+\/\d{4}$/i.test(str)) {
+    return str.toUpperCase();
+  }
+  const match = str.match(/(?:QT-?)?(\d+)/i);
+  const digits = match && match[1] ? match[1] : (str.replace(/\D/g, "") || "0");
+  const d = date instanceof Date && !isNaN(date.getTime()) ? date : new Date(date || Date.now());
+  const year = isNaN(d.getFullYear()) ? new Date().getFullYear() : d.getFullYear();
+  return `QTY/WTS${digits}/${year}`;
 }
 
 function loadAssetDataUri(filename) {
@@ -146,6 +153,16 @@ function signatureImageHtml(className = "pdf-signature") {
   const src = loadAssetDataUri("pdf_signature.png");
   if (!src) return `<div class="sig-underline">Signature</div>`;
   return `<div class="${className}"><img src="${src}" alt="Authorized signature" /></div>`;
+}
+
+function getWatermarkDataUri() {
+  return loadAssetDataUri("pdf_watermark.png");
+}
+
+function watermarkHtml() {
+  const src = getWatermarkDataUri();
+  if (!src) return "";
+  return `<div class="pdf-watermark"><img src="${src}" alt="Watermark" /></div>`;
 }
 
 /** Reset Chromium's default #header/#footer padding so banners sit on the page edges. */
@@ -294,6 +311,8 @@ const WOODIE_STYLES = `
     width: 100%;
   }
   .page-body {
+    position: relative;
+    z-index: 2;
     width: 100%;
     margin: 0;
     padding: 6px 12px 10px;
@@ -331,7 +350,25 @@ const WOODIE_STYLES = `
     height: 16.5mm;
     object-fit: fill;
   }
+  .pdf-watermark {
+    position: fixed;
+    top: 56%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 105mm;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.35;
+  }
+  .pdf-watermark img {
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+  }
   body.woodie-doc .page-body {
+    position: relative;
+    z-index: 2;
     padding: 52mm 12px 22mm;
   }
   body.woodie-doc .force-page-break {
@@ -409,7 +446,7 @@ const WOODIE_STYLES = `
     width: 14%;
   }
   table.wts .val {
-    background: #fff;
+    background: transparent;
     font-size: 10px;
     width: 36%;
   }
@@ -443,7 +480,7 @@ const WOODIE_STYLES = `
   }
   table.items td {
     font-size: 9px;
-    background: #fff;
+    background: transparent;
     vertical-align: top;
   }
   table.items td.desc {
@@ -453,7 +490,7 @@ const WOODIE_STYLES = `
   table.items .r { text-align: right; white-space: nowrap; }
   table.items tr.project-row td {
     font-weight: bold;
-    background: #fff;
+    background: transparent;
     text-align: left;
     padding: 5px 6px;
   }
@@ -604,9 +641,9 @@ const WOODIE_STYLES = `
   table.summary-left .italic {
     font-style: italic;
     min-height: 16px;
-    background: #fff;
+    background: transparent;
   }
-  table.summary-right .r { text-align: right; font-weight: bold; background: #fff; }
+  table.summary-right .r { text-align: right; font-weight: bold; background: transparent; }
   table.summary-right tr.last td { background: ${COLORS.peach}; }
 
   .signatures {
@@ -890,6 +927,7 @@ function wrapHtmlDocument(title, bodyInner, options = {}) {
     invoiceDoc = false,
     /** Shared sticky header/footer for quotation + invoice */
     woodieDoc = false,
+    includeWatermark = true,
   } = options;
   const header = chromeHeaderFooter ? "" : headerBannerHtml();
   const footer = chromeHeaderFooter
@@ -897,6 +935,7 @@ function wrapHtmlDocument(title, bodyInner, options = {}) {
     : includeFooter || invoiceDoc || woodieDoc
       ? footerBannerHtml()
       : "";
+  const watermark = includeWatermark ? watermarkHtml() : "";
   const bodyClass =
     invoiceDoc || woodieDoc
       ? ` class="${invoiceDoc ? "invoice-doc" : "woodie-doc"}"`
@@ -910,6 +949,7 @@ function wrapHtmlDocument(title, bodyInner, options = {}) {
   <style>${buildStyles()}</style>
 </head>
 <body${bodyClass}>
+  ${watermark}
   ${header}
   <div class="page-body">
     ${bodyInner}
@@ -931,6 +971,8 @@ module.exports = {
   calcBoqTotals,
   metaPair,
   signatureImageHtml,
+  getWatermarkDataUri,
+  watermarkHtml,
   wrapHtmlDocument,
   renderPdfFromHtml,
 };

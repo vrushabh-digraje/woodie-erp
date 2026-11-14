@@ -2,10 +2,19 @@ const crypto = require("crypto");
 const { TeamMember } = require("../models/TeamMember");
 const { generateEmployeeId } = require("../config/seedUsers");
 const { validateTeamMemberPayload } = require("../validators/teamValidator");
-const { ROLES } = require("../config/rbac");
+const { ROLES, FIELD_ROLES, isMasterAdmin } = require("../config/rbac");
+const { buildTenantFilter } = require("../middleware/tenantIsolation");
 
 function generatePassword(length = 10) {
   return crypto.randomBytes(length).toString("base64url").slice(0, length);
+}
+
+function matchesMemberCompany(member, user) {
+  if (!member || !user) return false;
+  if (isMasterAdmin(user.role)) return true;
+  const userCo = (user.companyId || "woodie-1").toLowerCase();
+  const memCo = (member.companyId || "woodie-1").toLowerCase();
+  return userCo === memCo;
 }
 
 async function listTeamMembers(req, res) {
@@ -14,7 +23,7 @@ async function listTeamMembers(req, res) {
   if (status !== "All") filter.status = status;
   if (String(assignable).toLowerCase() === "true") {
     filter.status = "Active";
-    filter.role = { $in: require("../config/rbac").FIELD_ROLES };
+    filter.role = { $in: FIELD_ROLES };
   }
   const search = String(q).trim();
   if (search) {
@@ -24,13 +33,24 @@ async function listTeamMembers(req, res) {
       { employeeId: { $regex: search, $options: "i" } },
     ];
   }
-  const data = await TeamMember.find(filter).select("-passwordHash").sort({ name: 1 });
+  let scopedFilter = buildTenantFilter(req, filter);
+  const activeCo = req.companyId || (isMasterAdmin(req.user?.role) ? req.headers?.["x-company-id"] : null);
+  if (activeCo && activeCo !== "all") {
+    scopedFilter = {
+      ...scopedFilter,
+      role: { $ne: ROLES.MASTER_ADMIN },
+    };
+  }
+  const data = await TeamMember.find(scopedFilter).select("-passwordHash").sort({ name: 1 });
   return res.json(data);
 }
 
 async function getTeamMemberById(req, res) {
   const member = await TeamMember.findById(req.params.id).select("-passwordHash");
   if (!member) return res.status(404).json({ message: "Team member not found" });
+  if (!matchesMemberCompany(member, req.user)) {
+    return res.status(403).json({ message: "You cannot access team members from another company" });
+  }
   return res.json(member);
 }
 
@@ -51,6 +71,9 @@ async function createTeamMember(req, res) {
 
   const passwordHash = await TeamMember.hashPassword(plainPassword);
   const employeeId = await generateEmployeeId();
+  const companyId = isMasterAdmin(req.user.role) && req.body.companyId
+    ? req.body.companyId
+    : (req.companyId || req.user.companyId || "woodie-1");
 
   const member = await TeamMember.create({
     employeeId,
@@ -58,6 +81,7 @@ async function createTeamMember(req, res) {
     phone: req.body.phone,
     email,
     role: req.body.role,
+    companyId,
     status: req.body.status,
     passwordHash,
   });
@@ -76,6 +100,9 @@ async function updateTeamMember(req, res) {
 
   const member = await TeamMember.findById(req.params.id).select("+passwordHash");
   if (!member) return res.status(404).json({ message: "Team member not found" });
+  if (!matchesMemberCompany(member, req.user)) {
+    return res.status(403).json({ message: "You cannot edit team members from another company" });
+  }
 
   if (req.body.email) {
     const email = String(req.body.email).trim().toLowerCase();
@@ -88,6 +115,9 @@ async function updateTeamMember(req, res) {
   if (req.body.phone) member.phone = req.body.phone;
   if (req.body.role) member.role = req.body.role;
   if (req.body.status) member.status = req.body.status;
+  if (isMasterAdmin(req.user.role) && req.body.companyId) {
+    member.companyId = req.body.companyId;
+  }
 
   let generatedPassword;
   if (req.body.password || req.body.generatePassword) {
@@ -111,11 +141,8 @@ async function deleteTeamMember(req, res) {
   }
   const member = await TeamMember.findById(req.params.id);
   if (!member) return res.status(404).json({ message: "Team member not found" });
-  if (member.role === ROLES.ADMIN) {
-    const adminCount = await TeamMember.countDocuments({ role: ROLES.ADMIN, status: "Active" });
-    if (adminCount <= 1) {
-      return res.status(400).json({ message: "Cannot delete the only active admin" });
-    }
+  if (!matchesMemberCompany(member, req.user)) {
+    return res.status(403).json({ message: "You cannot delete team members from another company" });
   }
   await member.deleteOne();
   return res.status(204).send();

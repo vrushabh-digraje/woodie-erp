@@ -4,6 +4,7 @@ const { WorkOrder } = require("../models/WorkOrder");
 const { isFieldRole } = require("../config/rbac");
 const { isAssignedToWorkOrder } = require("../middleware/workOrderAccess");
 const { formatCount } = require("../utils/formatCount");
+const { buildTenantFilter } = require("../middleware/tenantIsolation");
 
 const ALLOWED_WO_STATUSES = ["Scheduled", "In Progress"];
 
@@ -192,6 +193,7 @@ async function createMaterialRequest(req, res) {
 
     const doc = await MaterialRequest.create({
       requestNumber,
+      companyId: workOrder.companyId || (req.companyId || "woodie-1"),
       workOrderId: workOrder._id,
       workOrderNumber: workOrder.workOrderNumber,
       projectName: workOrder.projectName,
@@ -234,7 +236,8 @@ async function listMaterialRequests(req, res) {
       ];
     }
 
-    const query = MaterialRequest.find(filter)
+    const scopedFilter = buildTenantFilter(req, filter);
+    const query = MaterialRequest.find(scopedFilter)
       .sort({ createdAt: -1 })
       .populate("requestedBy", "name email role")
       .populate("approvedBy", "name email role");

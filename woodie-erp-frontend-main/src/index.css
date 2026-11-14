@@ -11,6 +11,9 @@
   --color-brand-amber-dark: #c07010;
   --color-brand-amber-hover: #d4921a;
   --color-brand-navy-light: #243a5c;
+  --color-brand-gold: #e8a020;
+  --color-brand-gold-light: rgba(232, 160, 32, 0.15);
+  --color-brand-gold-hover: #d4921a;
 
   /* Legacy aliases (map to new brand) */
   --color-brand-primary: #e8a020;

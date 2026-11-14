@@ -19,7 +19,8 @@ import { themeClasses } from "../../../theme/classes";
 import { deleteInquiry, getInquiriesPage } from "../services/inquiryApi";
 import type { Inquiry, InquiryStatus } from "../services/inquiryTypes";
 import { AppFeedbackPopup, useAppFeedback } from "../../../components/AppFeedback";
-import { EmptyState, InquiryStatCard, StatusBadge } from "../components/inquiryShared";
+import { useAuth } from "../../auth/AuthContext";
+import { BoqStatusBadge, EmptyState, InquiryStatCard, SiteVisitBadge, StatusBadge } from "../components/inquiryShared";
 import { visitDateToInputValue } from "../mapUtils";
 
 const STATUS_OPTIONS: (InquiryStatus | "All")[] = [
@@ -33,6 +34,7 @@ const STATUS_OPTIONS: (InquiryStatus | "All")[] = [
 ];
 
 function InquiryListingPage() {
+  const { activeCompany } = useAuth();
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<InquiryStatus | "All">("All");
@@ -54,11 +56,11 @@ function InquiryListingPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, page]);
+  }, [search, statusFilter, page, activeCompany]);
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, activeCompany]);
 
   useEffect(() => {
     void loadData();
@@ -68,9 +70,9 @@ function InquiryListingPage() {
     () => inquiries.filter((i) => i.status === "Visit Pending Approval").length,
     [inquiries],
   );
-  const rejectedCount = useMemo(() => inquiries.filter((i) => i.status === "Visit Rejected").length, [inquiries]);
-  const reportCount = useMemo(
-    () => inquiries.filter((i) => i.status === "Site Report Attached").length,
+  const rejectedCount = useMemo(() => inquiries.filter((i) => i.status === "Visit Rejected" || i.status === "Lost").length, [inquiries]);
+  const acceptedCount = useMemo(
+    () => inquiries.filter((i) => i.status === "Visit Approved" || i.status === "Site Report Attached" || i.status === "Won").length,
     [inquiries],
   );
 
@@ -120,8 +122,8 @@ function InquiryListingPage() {
       <div className="space-y-4">
         <section className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
           <InquiryStatCard title="Total" value={String(total)} detail="All inquiries" icon={FolderSearch} iconIndex={0} />
-          <InquiryStatCard title="Pending Approval" value={String(pendingCount)} detail="Awaiting assignee decision" icon={UserCheck} iconIndex={1} />
-          <InquiryStatCard title="Reports Done" value={String(reportCount)} detail={`${rejectedCount} rejected`} icon={FolderSearch} iconIndex={2} />
+          <InquiryStatCard title="Pending" value={String(pendingCount)} detail="Awaiting decision" icon={UserCheck} iconIndex={1} />
+          <InquiryStatCard title="Accepted" value={String(acceptedCount)} detail={`${rejectedCount} rejected`} icon={FolderSearch} iconIndex={2} />
         </section>
 
         <section className={themeClasses.cardPadding}>
@@ -150,7 +152,13 @@ function InquiryListingPage() {
               >
                 {STATUS_OPTIONS.map((s) => (
                   <option key={s} value={s}>
-                    {s}
+                    {s === "Visit Approved"
+                      ? "Accepted"
+                      : s === "Visit Rejected"
+                        ? "Rejected"
+                        : s === "Visit Pending Approval"
+                          ? "Pending"
+                          : s}
                   </option>
                 ))}
               </select>
@@ -172,7 +180,20 @@ function InquiryListingPage() {
                   <li key={item._id} className="app-card p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="font-mono text-xs font-semibold text-ui-primary">{item.inquiryNumber}</p>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span
+                            className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold border ${
+                              item.companyId === "woodie-2"
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : item.companyId === "woodie-3"
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : "bg-blue-50 text-blue-800 border-blue-200"
+                            }`}
+                          >
+                            {item.companyId === "woodie-2" ? "Woodie 2" : item.companyId === "woodie-3" ? "Woodie 3" : "Woodie 1"}
+                          </span>
+                          <p className="font-mono text-xs font-semibold text-ui-primary">{item.inquiryNumber}</p>
+                        </div>
                         <p className="truncate font-semibold text-text-primary">{item.clientName}</p>
                         <p className="mt-1 truncate text-xs text-text-muted">
                           {item.category} · {item.assignedPersonName}
@@ -180,8 +201,10 @@ function InquiryListingPage() {
                         <p className="mt-1 text-xs text-text-muted">
                           {visitDateToInputValue(item.scheduleVisitDate)} {item.scheduleVisitTime}
                         </p>
-                        <div className="mt-2">
+                        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                           <StatusBadge status={item.status} short />
+                          <SiteVisitBadge item={item} />
+                          <BoqStatusBadge item={item} />
                         </div>
                       </div>
                       <InquiryActions item={item} />
@@ -194,18 +217,34 @@ function InquiryListingPage() {
                 <DataTable>
                   <DataTableHeader>
                     <DataTableHeadRow>
+                      <DataTableTh>Company</DataTableTh>
                       <DataTableTh>Inquiry</DataTableTh>
                       <DataTableTh>Client</DataTableTh>
                       <DataTableTh>Category</DataTableTh>
                       <DataTableTh>Assignee</DataTableTh>
                       <DataTableTh>Visit</DataTableTh>
                       <DataTableTh>Status</DataTableTh>
+                      <DataTableTh>Site Visit</DataTableTh>
+                      <DataTableTh>BOQ Status</DataTableTh>
                       <DataTableTh align="right">Action</DataTableTh>
                     </DataTableHeadRow>
                   </DataTableHeader>
                   <DataTableBody>
                     {inquiries.map((item) => (
                       <DataTableRow key={item._id}>
+                        <DataTableTd className="whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold border ${
+                              item.companyId === "woodie-2"
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : item.companyId === "woodie-3"
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : "bg-blue-50 text-blue-800 border-blue-200"
+                            }`}
+                          >
+                            {item.companyId === "woodie-2" ? "Woodie 2" : item.companyId === "woodie-3" ? "Woodie 3" : "Woodie 1"}
+                          </span>
+                        </DataTableTd>
                         <DataTableTd className="max-w-[5.5rem] font-medium font-mono text-ui-primary">
                           <TruncatedText text={item.inquiryNumber} maxClass="max-w-[5.5rem]" />
                         </DataTableTd>
@@ -224,8 +263,14 @@ function InquiryListingPage() {
                             maxClass="max-w-[8rem]"
                           />
                         </DataTableTd>
-                        <DataTableTd className="max-w-[9rem]">
+                        <DataTableTd className="max-w-[7rem]">
                           <StatusBadge status={item.status} short />
+                        </DataTableTd>
+                        <DataTableTd className="max-w-[8.5rem]">
+                          <SiteVisitBadge item={item} />
+                        </DataTableTd>
+                        <DataTableTd className="max-w-[8.5rem]">
+                          <BoqStatusBadge item={item} />
                         </DataTableTd>
                         <DataTableTd align="right">
                           <InquiryActions item={item} />

@@ -1,8 +1,8 @@
-import { LogOut, PanelLeft } from "lucide-react";
+import { Building2, LogOut, PanelLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { COLORS } from "../../constants/colors";
 import { useAuth } from "../../features/auth/AuthContext";
-import { roleLabel } from "../../features/auth/permissions";
+import { isMasterAdmin, roleLabel } from "../../features/auth/permissions";
 import { useSidebar } from "./SidebarContext";
 
 type TopNavbarProps = {
@@ -11,9 +11,10 @@ type TopNavbarProps = {
 };
 
 export default function TopNavbar({ title, subtitle }: TopNavbarProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, activeCompany, setActiveCompany } = useAuth();
   const { toggle, mobileMenuOpen } = useSidebar();
   const navigate = useNavigate();
+  const isSuper = user ? isMasterAdmin(user.role) : false;
   const initial = (user?.name ?? "U").charAt(0).toUpperCase();
 
   return (
@@ -60,6 +61,28 @@ export default function TopNavbar({ title, subtitle }: TopNavbarProps) {
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+        {isSuper ? (
+          <div className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs shadow-2xs">
+            <Building2 className="h-3.5 w-3.5 text-brand-gold shrink-0" />
+            <select
+              value={activeCompany}
+              onChange={(e) => setActiveCompany(e.target.value)}
+              className="bg-transparent font-bold text-slate-800 cursor-pointer focus:outline-hidden pr-1 text-xs"
+              aria-label="Filter active company"
+            >
+              <option value="all">🏢 All Companies</option>
+              <option value="woodie-1">🏢 Woodie 1</option>
+              <option value="woodie-2">🏢 Woodie 2</option>
+              <option value="woodie-3">🏢 Woodie 3</option>
+            </select>
+          </div>
+        ) : (
+          <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800 border border-blue-200">
+            <Building2 className="h-3 w-3" />
+            {user?.companyId === "woodie-2" ? "Woodie 2" : user?.companyId === "woodie-3" ? "Woodie 3" : "Woodie 1"}
+          </span>
+        )}
+
         <div className="hidden text-right sm:block">
           <p className="text-xs font-semibold" style={{ color: COLORS.text.primary }}>
             {user?.name ?? "User"}

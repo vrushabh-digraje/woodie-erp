@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   BadgePercent,
@@ -10,10 +10,12 @@ import {
   Clock3,
   Download,
   FileSpreadsheet,
+  FileText,
   GitBranch,
   ListChecks,
   Loader2,
   MessageSquare,
+  Pencil,
   Percent,
   Plus,
   Receipt,
@@ -22,6 +24,7 @@ import {
   ShieldCheck,
   Trash2,
   UserRound,
+  X,
 } from "lucide-react";
 import AppShell from "../../components/layout/AppShell";
 import { RamsModal } from "./RamsModal";
@@ -46,16 +49,35 @@ import {
   requestQuotationRevision,
   saveQuotationDraft,
   submitQuotationForApproval,
+  toggleQuotationSubmission,
   updateQuotation,
 } from "./boqApi";
 import { themeClasses } from "../../theme/classes";
 import { BoqFeedbackPopup, useBoqFeedback } from "./boqFeedback";
-import { ApprovalFlow, CategoryBadge, formatMoney, PricingCard, StatusBadge } from "./boqShared";
+import {
+  ApprovalFlow,
+  CategoryBadge,
+  formatMoney,
+  isQuotationSubmitted,
+  PricingCard,
+  QuotationSubmissionBadge,
+  StatusBadge,
+} from "./boqShared";
 import QuotationSiteInformationPanel from "./QuotationSiteInformationPanel";
 import type { BoqCategory, BoqItem, BoqQuotation } from "./boqTypes";
 
 const categories: BoqCategory[] = ["Material", "Labor", "Equipment", "Service"];
-const EDITABLE = ["BOQ In Progress", "Quotation Draft", "Revision Requested"];
+const EDITABLE = [
+  "BOQ In Progress",
+  "Quotation Draft",
+  "Revision Requested",
+  "Rejected",
+  "Pending Approval",
+  "Approved",
+  "Quotation Sent",
+  "Negotiation",
+];
+const DRAFT_STATUSES = ["BOQ In Progress", "Quotation Draft", "Revision Requested"];
 const PRICE_EDITABLE_STATUSES = [
   "BOQ In Progress",
   "Quotation Draft",
@@ -71,6 +93,52 @@ const fieldLabelClass =
   "mb-1 block text-[10px] font-semibold uppercase tracking-wide text-text-muted";
 const readValueClass =
   "break-words text-sm leading-snug text-text-primary [overflow-wrap:anywhere]";
+
+function formatRefNo(quotationNumber: string, dateStr?: string | null): string {
+  const str = String(quotationNumber || "").trim();
+  if (/^QTY\/WTS\d+\/\d{4}$/i.test(str)) {
+    return str.toUpperCase();
+  }
+  const match = str.match(/(?:QT-?)?(\d+)/i);
+  const digits = match && match[1] ? match[1] : (str.replace(/\D/g, "") || "0");
+  const d = dateStr ? new Date(dateStr) : new Date();
+  const year = isNaN(d.getFullYear()) ? new Date().getFullYear() : d.getFullYear();
+  return `QTY/WTS${digits}/${year}`;
+}
+
+function toDateInputValue(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().split("T")[0];
+}
+
+function formatNormalAddress(raw?: string | null, fallbackEmirates = "Dubai"): string {
+  if (!raw || !raw.trim()) return "";
+  let cleaned = raw
+    .replace(/\s*(?:>|->|→)\s*/g, ", ")
+    .replace(/\b(?:near|opposite|next to|behind)\s+(?:the\s+)?(?:elevator|lift|stairs|staircase|lobby|reception)\b[^\n,;]*/gi, "")
+    .replace(/\b(?:\d+(?:st|nd|rd|th)?|ground|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|mezzanine|basement)\s+(?:floor|flr|level|lvl)\b/gi, "")
+    .replace(/\b(?:floor|flr|level|lvl)\s*(?:no\.?|#)?\s*\d+\b/gi, "")
+    .replace(/\b(?:room|rm)\s*(?:no\.?|#)?\s*[a-z0-9-]+\b/gi, "")
+    .replace(/[\r\n\t ]+/g, " ")
+    .replace(/\s*,\s*,+/g, ",")
+    .replace(/\s*;\s*/g, ", ")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/^[,\s\-:]+/, "")
+    .replace(/[,\s\-:]+$/, "")
+    .trim();
+
+  if (!cleaned || cleaned.length < 3) {
+    cleaned = raw.replace(/\s*(?:>|->|→)\s*/g, ", ").replace(/[\r\n]+/g, ", ").trim();
+  }
+  const em = (fallbackEmirates || "Dubai").trim();
+  const lower = cleaned.toLowerCase();
+  if (em && !lower.includes(em.toLowerCase()) && !lower.includes("uae") && !lower.includes("united arab emirates")) {
+    cleaned = `${cleaned}, ${em}, UAE`;
+  }
+  return cleaned;
+}
 
 function SectionCard({
   title,
@@ -256,6 +324,7 @@ type NegotiationAction = "won" | "lost" | "negotiation";
 
 function QuotationDetailPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const role = user?.role ?? "sales";
@@ -263,7 +332,15 @@ function QuotationDetailPage() {
   const [quotation, setQuotation] = useState<BoqQuotation | null>(null);
   const [items, setItems] = useState<BoqItem[]>([]);
   const [projectName, setProjectName] = useState("");
+  const [location, setLocation] = useState("");
   const [clientName, setClientName] = useState("");
+  const [attn, setAttn] = useState("");
+  const [emirates, setEmirates] = useState("Dubai");
+  const [clientRef, setClientRef] = useState("");
+  const [vendorTrn, setVendorTrn] = useState("");
+  const [subject, setSubject] = useState("");
+  const [revision, setRevision] = useState(0);
+  const [quoteDate, setQuoteDate] = useState<string | null>(null);
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [taxPercent, setTaxPercent] = useState("8");
@@ -272,6 +349,9 @@ function QuotationDetailPage() {
   const [notes, setNotes] = useState("");
   const [managerRemarks, setManagerRemarks] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState<boolean>(
+    () => searchParams.get("mode") === "edit",
+  );
   const { msg, notifyOk, notifyErr, notifyErrText, dismiss } = useBoqFeedback();
   const [busy, setBusy] = useState(false);
   const [actionLoading, setActionLoading] = useState<NegotiationAction | null>(null);
@@ -286,8 +366,36 @@ function QuotationDetailPage() {
   const [lossReasonError, setLossReasonError] = useState("");
   const [linkedWorkOrder, setLinkedWorkOrder] = useState<WorkOrder | null>(null);
   const [woBusy, setWoBusy] = useState(false);
+  const [submissionBusy, setSubmissionBusy] = useState(false);
 
-  const canEdit = canManageBoq(role) && quotation && EDITABLE.includes(quotation.status);
+  async function handleToggleSubmission(targetSubmitted: boolean) {
+    if (!quotation) return;
+    setSubmissionBusy(true);
+    dismiss();
+    try {
+      const updated = await toggleQuotationSubmission(quotation._id, targetSubmitted);
+      setQuotation(updated);
+      notifyOk(
+        isQuotationSubmitted(updated)
+          ? "Quotation marked as submitted to client."
+          : "Quotation marked as not submitted."
+      );
+    } catch (err) {
+      notifyErr(err, "Failed to update quotation submission status.");
+    } finally {
+      setSubmissionBusy(false);
+    }
+  }
+
+  const isDraftStage = Boolean(
+    quotation && DRAFT_STATUSES.includes(quotation.status),
+  );
+  const isStatusEditable = Boolean(
+    quotation && EDITABLE.includes(quotation.status),
+  );
+  const canEdit = Boolean(
+    canManageBoq(role) && isStatusEditable && (isDraftStage || isEditing),
+  );
   const canEditPrice =
     canManageBoq(role) && quotation && PRICE_EDITABLE_STATUSES.includes(quotation.status);
   const isApprovedStage = Boolean(
@@ -332,7 +440,16 @@ function QuotationDetailPage() {
       setQuotation(data);
       setItems(data.items ?? []);
       setProjectName(data.projectName ?? "");
+      const rawLoc = data.location ?? data.siteInformation?.location ?? "";
+      setLocation(rawLoc.includes(">") || rawLoc.includes("->") || rawLoc.includes("→") ? formatNormalAddress(rawLoc, data.emirates) : rawLoc);
       setClientName(data.clientName ?? "");
+      setAttn(data.attn ?? "");
+      setEmirates(data.emirates ?? "Dubai");
+      setClientRef(data.clientRef ?? "");
+      setVendorTrn(data.vendorTrn ?? "");
+      setSubject(data.subject ?? "");
+      setRevision(data.revision ?? 0);
+      setQuoteDate(data.quoteDate ?? data.createdAt ?? null);
       setClientEmail(data.clientEmail ?? "");
       setClientPhone(data.clientPhone ?? "");
       setTaxPercent(String(data.taxPercent ?? 8));
@@ -393,6 +510,14 @@ function QuotationDetailPage() {
   function buildPayload() {
     return {
       projectName,
+      location,
+      attn,
+      emirates,
+      clientRef,
+      vendorTrn,
+      subject,
+      revision,
+      quoteDate,
       clientName,
       clientEmail,
       clientPhone,
@@ -412,7 +537,16 @@ function QuotationDetailPage() {
       const updated = await updateQuotation(id, buildPayload());
       setQuotation(updated);
       setItems(updated.items ?? []);
-      notifyOk(isApprovedStage ? "Pricing updated successfully." : "BOQ saved.");
+      const updatedLoc = updated.location ?? updated.siteInformation?.location ?? "";
+      setLocation(updatedLoc.includes(">") || updatedLoc.includes("->") || updatedLoc.includes("→") ? formatNormalAddress(updatedLoc, updated.emirates) : updatedLoc);
+      setAttn(updated.attn ?? "");
+      setEmirates(updated.emirates ?? "Dubai");
+      setClientRef(updated.clientRef ?? "");
+      setVendorTrn(updated.vendorTrn ?? "");
+      setSubject(updated.subject ?? "");
+      setRevision(updated.revision ?? 0);
+      setQuoteDate(updated.quoteDate ?? updated.createdAt ?? null);
+      notifyOk(isApprovedStage ? "Quotation updated successfully." : "BOQ saved.");
     } catch (err) {
       notifyErr(err, "Save failed.");
     } finally {
@@ -445,7 +579,7 @@ function QuotationDetailPage() {
       const updated = await submitQuotationForApproval(id);
       setQuotation(updated);
       notifyOk(
-        isAdmin(role) ? "Quotation saved and approved." : "Submitted for manager approval.",
+        canApproveBoq(role) ? "Quotation saved and submitted." : "Submitted for manager approval.",
       );
     } catch (err) {
       notifyErr(err, "Submit failed.");
@@ -532,6 +666,14 @@ function QuotationDetailPage() {
     setBusy(true);
     dismiss();
     try {
+      if (canManageBoq(role) && isStatusEditable) {
+        try {
+          const updated = await updateQuotation(id, buildPayload());
+          setQuotation(updated);
+        } catch {
+          // Continue download even if auto-sync fails
+        }
+      }
       const blob = await downloadQuotationPdf(id);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -694,6 +836,12 @@ function QuotationDetailPage() {
                   {quotation.quotationNumber}
                 </h1>
                 <StatusBadge status={quotation.status} />
+                <QuotationSubmissionBadge
+                  quotation={quotation}
+                  canEdit={canManageBoq(role)}
+                  loading={submissionBusy}
+                  onToggle={handleToggleSubmission}
+                />
               </div>
               <p className="truncate text-sm font-medium text-text-secondary">
                 {projectName || "Untitled project"}
@@ -719,6 +867,54 @@ function QuotationDetailPage() {
                   onClick={() => setShowDeleteModal(true)}
                 />
               ) : null}
+
+              <Link
+                to={`/boq/${quotation._id}/costing?block=0`}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-900 shadow-xs hover:bg-amber-100 hover:border-amber-400 transition-all cursor-pointer"
+                title="Open Costing & Rate Analysis Breakdown"
+              >
+                <FileSpreadsheet className="h-4 w-4 text-amber-700" />
+                Costing Sheet
+              </Link>
+
+              {canManageBoq(role) && isStatusEditable ? (
+                isEditing ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void handleSave()}
+                      className={themeClasses.btnSuccess}
+                      title="Save BOQ Changes"
+                    >
+                      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Save Changes
+                    </button>
+                    {!isDraftStage ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditing(false)}
+                        className={themeClasses.btnSecondary}
+                        title="Done Editing"
+                      >
+                        <X className="h-4 w-4" />
+                        Done
+                      </button>
+                    ) : null}
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-blue-600/30 bg-blue-50 px-3.5 py-2 text-xs font-semibold text-blue-800 shadow-xs hover:bg-blue-100 hover:border-blue-600/50 transition-all cursor-pointer"
+                    title="Edit BOQ Details, Location & Line Items"
+                  >
+                    <Pencil className="h-4 w-4 text-blue-700" />
+                    Edit BOQ
+                  </button>
+                )
+              ) : null}
+
               {canDownloadPdf ? (
                 <>
                   <button
@@ -748,15 +944,191 @@ function QuotationDetailPage() {
           </div>
         </header>
 
+        {isEditing && !isDraftStage ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50/90 p-3.5 text-xs text-blue-900 shadow-xs">
+            <span className="flex items-center gap-2 font-medium">
+              <Pencil className="h-4 w-4 text-blue-700 shrink-0" />
+              <span>
+                <strong>Editing Mode Active:</strong> You can edit project information, site address location, line items, and pricing.
+              </span>
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void handleSave()}
+                className="inline-flex items-center gap-1 rounded-lg bg-blue-700 px-3 py-1.5 font-semibold text-white shadow-2xs hover:bg-blue-800 transition cursor-pointer"
+              >
+                <Save className="h-3.5 w-3.5" />
+                Save Changes
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="cursor-pointer rounded-lg border border-blue-300 bg-white px-2.5 py-1.5 font-medium text-blue-800 hover:bg-blue-50 transition"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start xl:gap-6">
           {/* Main column */}
           <div className="min-w-0 space-y-5">
-            <SectionCard title="Project & client" icon={Building2}>
-              <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Project name" value={projectName} onChange={setProjectName} disabled={!canEdit} />
-                <Field label="Client name" value={clientName} onChange={setClientName} disabled={!canEdit} />
-                <Field label="Client email" value={clientEmail} onChange={setClientEmail} disabled={!canEdit} />
-                <Field label="Client phone" value={clientPhone} onChange={setClientPhone} disabled={!canEdit} />
+            <SectionCard
+              title="Quotation & project details"
+              icon={FileText}
+              action={
+                canManageBoq(role) && isStatusEditable ? (
+                  isEditing ? (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void handleSave()}
+                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-800 transition cursor-pointer"
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                        Save Changes
+                      </button>
+                      {!isDraftStage ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsEditing(false)}
+                          className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                        >
+                          Done
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-blue-600/30 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 shadow-2xs hover:bg-blue-100 transition cursor-pointer"
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-blue-700" />
+                      Edit Details
+                    </button>
+                  )
+                ) : null
+              }
+            >
+              <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {/* Quotation Metadata Row */}
+                <Field
+                  label="Ref No"
+                  value={formatRefNo(quotation.quotationNumber, quoteDate)}
+                  onChange={() => {}}
+                  disabled={true}
+                />
+                <Field
+                  label="Date"
+                  type="date"
+                  value={toDateInputValue(quoteDate)}
+                  onChange={setQuoteDate}
+                  disabled={!canEdit}
+                />
+                <Field
+                  label="Revision (REV)"
+                  type="number"
+                  value={String(revision ?? 0)}
+                  onChange={(v) => setRevision(Number(v) || 0)}
+                  disabled={!canEdit}
+                />
+                <Field
+                  label="Vendor TRN"
+                  value={vendorTrn}
+                  onChange={setVendorTrn}
+                  disabled={!canManageBoq(role) || !isStatusEditable}
+                  placeholder="e.g. 100548827300003"
+                />
+
+                {/* Client & Parties Row */}
+                <Field
+                  label="Client"
+                  value={clientName}
+                  onChange={setClientName}
+                  disabled={!canEdit}
+                  placeholder="Client name"
+                />
+                <Field
+                  label="Attention (ATTN)"
+                  value={attn}
+                  onChange={setAttn}
+                  disabled={!canEdit}
+                  placeholder="Contact person"
+                />
+                <Field
+                  label="Client Ref No"
+                  value={clientRef}
+                  onChange={setClientRef}
+                  disabled={!canManageBoq(role) || !isStatusEditable}
+                  placeholder="e.g. INQ-0021"
+                />
+                <Field
+                  label="Emirates"
+                  value={emirates}
+                  onChange={setEmirates}
+                  disabled={!canEdit}
+                  placeholder="e.g. Dubai"
+                />
+
+                {/* Client Contact Info */}
+                <div className="sm:col-span-2">
+                  <Field
+                    label="Client Email"
+                    type="email"
+                    value={clientEmail}
+                    onChange={setClientEmail}
+                    disabled={!canEdit}
+                    placeholder="client@example.com"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Field
+                    label="Client Phone"
+                    value={clientPhone}
+                    onChange={setClientPhone}
+                    disabled={!canEdit}
+                    placeholder="+971 50 123 4567"
+                  />
+                </div>
+
+                {/* Multi-line Scope: Location & Project */}
+                <div className="sm:col-span-2 lg:col-span-2">
+                  <TextareaField
+                    label="Location / Site Address"
+                    value={location}
+                    onChange={setLocation}
+                    disabled={!canEdit}
+                    rows={2}
+                    placeholder="e.g. Office 402, Building 4, Business Bay, Dubai, UAE"
+                  />
+                </div>
+                <div className="sm:col-span-2 lg:col-span-2">
+                  <TextareaField
+                    label="Project"
+                    value={projectName}
+                    onChange={setProjectName}
+                    disabled={!canEdit}
+                    rows={2}
+                    placeholder="Project title / description"
+                  />
+                </div>
+
+                {/* Subject spanning full width */}
+                <div className="sm:col-span-2 lg:col-span-4">
+                  <TextareaField
+                    label="Subject"
+                    value={subject}
+                    onChange={setSubject}
+                    disabled={!canEdit}
+                    rows={2}
+                    placeholder="Quotation scope / subject"
+                  />
+                </div>
               </div>
             </SectionCard>
 
@@ -906,7 +1278,7 @@ function QuotationDetailPage() {
                   {quotation.status === "Quotation Draft" || quotation.status === "Revision Requested" ? (
                     <button type="button" disabled={busy} onClick={() => void handleSubmit()} className={themeClasses.btnNavy}>
                       <Send className="h-4 w-4" />
-                      {isAdmin(role) ? "Save & approve" : "Submit for manager approval"}
+                      {canApproveBoq(role) ? "Save & submit" : "Submit for manager approval"}
                     </button>
                   ) : null}
                 </div>
@@ -1069,8 +1441,11 @@ function QuotationDetailPage() {
         isOpen={showRamsModal}
         onClose={() => setShowRamsModal(false)}
         quotationId={quotation._id}
-        defaultLocation={projectName || quotation.siteInformation?.location || ""}
+        projectName={projectName || quotation.projectName || quotation.subject || ""}
+        clientName={clientName || quotation.clientName || ""}
+        defaultLocation={location || quotation.location || quotation.siteInformation?.location || ""}
         defaultScope={quotation.siteInformation?.scopeOfWork || ""}
+        quoteDate={quoteDate || quotation.quoteDate || quotation.createdAt}
         onSuccess={notifyOk}
         onError={notifyErr}
       />
@@ -1417,12 +1792,14 @@ function Field({
   onChange,
   disabled,
   type = "text",
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
   type?: string;
+  placeholder?: string;
 }) {
   return (
     <div className="min-w-0">
@@ -1430,9 +1807,40 @@ function Field({
       <input
         type={type}
         value={value}
+        placeholder={placeholder}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         className={`${themeClasses.input} disabled:bg-surface-muted/60`}
+      />
+    </div>
+  );
+}
+
+function TextareaField({
+  label,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  rows = 2,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  rows?: number;
+}) {
+  return (
+    <div className="min-w-0">
+      <label className={fieldLabelClass}>{label}</label>
+      <textarea
+        rows={rows}
+        value={value}
+        placeholder={placeholder}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${themeClasses.input} resize-y disabled:bg-surface-muted/60`}
       />
     </div>
   );

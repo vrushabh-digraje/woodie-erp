@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ClipboardList, Eye, Search, Trash2 } from "lucide-react";
+import { ClipboardList, Eye, Pencil, Search, Trash2 } from "lucide-react";
 import AppShell from "../../components/layout/AppShell";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal";
 import {
@@ -19,34 +19,39 @@ import { canDeleteQuotation } from "../../lib/deleteRules";
 import { themeClasses } from "../../theme/classes";
 import { useAuth } from "../auth/AuthContext";
 import { canManageBoq } from "../auth/permissions";
-import { deleteQuotation, getQuotationsPage } from "./boqApi";
+import { deleteQuotation, getQuotationsPage, toggleQuotationSubmission } from "./boqApi";
 import { BoqFeedbackPopup, useBoqFeedback } from "./boqFeedback";
-import { formatMoney, PricingCard, StatusBadge } from "./boqShared";
-import type { BoqQuotation, QuotationStatus } from "./boqTypes";
+import {
+  formatMoney,
+  isQuotationSubmitted,
+  PricingCard,
+  QuotationSubmissionBadge,
+  StatusBadge,
+} from "./boqShared";
+import type { BoqQuotation } from "./boqTypes";
 
-const STATUS_OPTIONS: Array<QuotationStatus | "All"> = [
-  "All",
-  "BOQ In Progress",
-  "Quotation Draft",
-  "Pending Approval",
-  "Approved",
-  "Rejected",
-  "Revision Requested",
+const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "All", label: "All statuses" },
+  { value: "BOQ Done", label: "BOQ Done" },
+  { value: "Pending", label: "Pending" },
+  { value: "BOQ Progress", label: "BOQ Progress" },
+  { value: "Rejected", label: "Rejected" },
 ];
 
 function BoqPage() {
-  const { user } = useAuth();
+  const { user, activeCompany } = useAuth();
   const role = user?.role ?? "sales";
   const [searchParams] = useSearchParams();
-  const initialStatus = (searchParams.get("status") as QuotationStatus | "All");
+  const initialStatus = searchParams.get("status") || "All";
 
   const [quotations, setQuotations] = useState<BoqQuotation[]>([]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<QuotationStatus | "All">(initialStatus);
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [updatingSubmissionId, setUpdatingSubmissionId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BoqQuotation | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const { msg, notifyOk, notifyErr, dismiss } = useBoqFeedback();
@@ -61,11 +66,11 @@ function BoqPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, page]);
+  }, [search, statusFilter, page, activeCompany]);
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, activeCompany]);
 
   useEffect(() => {
     void loadData();
@@ -77,15 +82,38 @@ function BoqPage() {
   );
 
   const totals = useMemo(() => {
-    const pipeline = quotations.filter((q) =>
+    const boqProgress = quotations.filter((q) =>
       ["BOQ In Progress", "Quotation Draft", "Revision Requested"].includes(q.status),
     ).length;
-    const approved = quotations.filter((q) => q.status === "Approved").length;
+    const boqDone = quotations.filter((q) =>
+      ["Approved", "Quotation Sent", "Negotiation", "Won"].includes(q.status),
+    ).length;
     const value = quotations.reduce((s, q) => s + (q.grandTotal || 0), 0);
-    return { pipeline, approved, value };
+    return { boqProgress, boqDone, value };
   }, [quotations]);
 
   const title = role === "manager" ? "Quotation Approvals" : "BOQ & Quotations";
+
+  async function handleToggleSubmission(q: BoqQuotation, targetSubmitted: boolean) {
+    setUpdatingSubmissionId(q._id);
+    dismiss();
+    try {
+      const updated = await toggleQuotationSubmission(q._id, targetSubmitted);
+      setQuotations((prev) =>
+        prev.map((item) => (item._id === q._id ? { ...item, ...updated } : item))
+      );
+      const isSub = isQuotationSubmitted(updated);
+      notifyOk(
+        isSub
+          ? `Quotation ${q.quotationNumber} marked as submitted.`
+          : `Quotation ${q.quotationNumber} marked as not submitted.`
+      );
+    } catch (err) {
+      notifyErr(err, "Failed to update quotation submission status.");
+    } finally {
+      setUpdatingSubmissionId(null);
+    }
+  }
 
   async function confirmDeleteQuotation() {
     if (!deleteTarget) return;
@@ -117,9 +145,9 @@ function BoqPage() {
       />
       <div className="space-y-4">
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <PricingCard title="Pipeline" value={String(totals.pipeline)} detail="BOQ / draft / revision" icon={ClipboardList} />
-            <PricingCard title="Pending approval" value={String(pendingCount)} detail="Awaiting manager" icon={ClipboardList} />
-            <PricingCard title="Total value" value={formatMoney(totals.value)} detail="All quotations listed" icon={ClipboardList} />
+            <PricingCard title="BOQ Done" value={String(totals.boqDone)} detail="Approved or sent" icon={ClipboardList} />
+            <PricingCard title="Pending" value={String(pendingCount)} detail="Awaiting approval" icon={ClipboardList} />
+            <PricingCard title="BOQ Progress" value={String(totals.boqProgress)} detail="Draft / in progress" icon={ClipboardList} />
           </section>
 
           {/* {canApproveBoq(role) ? (
@@ -147,14 +175,14 @@ function BoqPage() {
                 <select
                   value={statusFilter}
                   onChange={(e) => {
-                    setStatusFilter(e.target.value as QuotationStatus | "All");
+                    setStatusFilter(e.target.value);
                     setPage(1);
                   }}
                   className={themeClasses.select}
                 >
-                  {STATUS_OPTIONS.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
+                  {STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>
@@ -186,11 +214,25 @@ function BoqPage() {
                           <p className="truncate font-semibold">{q.projectName || "—"}</p>
                           <p className="truncate text-sm text-text-muted">{q.clientName || "—"}</p>
                           <p className="mt-1 font-medium">{formatMoney(q.grandTotal)}</p>
-                          <div className="mt-2">
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
                             <StatusBadge status={q.status} />
+                            <QuotationSubmissionBadge
+                              quotation={q}
+                              canEdit={canManageBoq(role)}
+                              loading={updatingSubmissionId === q._id}
+                              onToggle={(target) => handleToggleSubmission(q, target)}
+                            />
                           </div>
                         </div>
                         <ListActionRow>
+                          <ListIconLink to={`/boq/${q._id}`} label="View">
+                            <Eye className="h-4 w-4" />
+                          </ListIconLink>
+                          {canManageBoq(role) ? (
+                            <ListIconLink to={`/boq/${q._id}?mode=edit`} label="Edit">
+                              <Pencil className="h-4 w-4" />
+                            </ListIconLink>
+                          ) : null}
                           {canDeleteQuotation(q.status, role, {
                             isOwner: !user?.id || String(q.createdBy) === String(user.id),
                           }) ? (
@@ -198,9 +240,6 @@ function BoqPage() {
                               <Trash2 className="h-4 w-4" />
                             </ListIconButton>
                           ) : null}
-                          <ListIconLink to={`/boq/${q._id}`} label="Open">
-                            <Eye className="h-4 w-4" />
-                          </ListIconLink>
                         </ListActionRow>
                       </div>
                     </li>
@@ -210,10 +249,12 @@ function BoqPage() {
                   <DataTable>
                     <DataTableHeader>
                       <DataTableHeadRow>
+                        <DataTableTh>Company</DataTableTh>
                         <DataTableTh>Number</DataTableTh>
                         <DataTableTh>Project</DataTableTh>
                         <DataTableTh>Client</DataTableTh>
                         <DataTableTh>Status</DataTableTh>
+                        <DataTableTh>Quotation Submitted</DataTableTh>
                         <DataTableTh>Total</DataTableTh>
                         <DataTableTh align="right">Action</DataTableTh>
                       </DataTableHeadRow>
@@ -221,6 +262,19 @@ function BoqPage() {
                     <DataTableBody>
                       {quotations.map((q) => (
                         <DataTableRow key={q._id}>
+                          <DataTableTd className="whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold border ${
+                                q.companyId === "woodie-2"
+                                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                  : q.companyId === "woodie-3"
+                                  ? "bg-amber-50 text-amber-800 border-amber-200"
+                                  : "bg-blue-50 text-blue-800 border-blue-200"
+                              }`}
+                            >
+                              {q.companyId === "woodie-2" ? "Woodie 2" : q.companyId === "woodie-3" ? "Woodie 3" : "Woodie 1"}
+                            </span>
+                          </DataTableTd>
                           <DataTableTd className="max-w-[5rem] font-medium">
                             <TruncatedText text={q.quotationNumber} maxClass="max-w-[5rem]" />
                           </DataTableTd>
@@ -233,9 +287,25 @@ function BoqPage() {
                           <DataTableTd className="max-w-[8rem]">
                             <StatusBadge status={q.status} />
                           </DataTableTd>
+                          <DataTableTd className="whitespace-nowrap">
+                            <QuotationSubmissionBadge
+                              quotation={q}
+                              canEdit={canManageBoq(role)}
+                              loading={updatingSubmissionId === q._id}
+                              onToggle={(target) => handleToggleSubmission(q, target)}
+                            />
+                          </DataTableTd>
                           <DataTableTd className="font-medium">{formatMoney(q.grandTotal)}</DataTableTd>
                           <DataTableTd align="right">
                             <ListActionRow>
+                              <ListIconLink to={`/boq/${q._id}`} label="View">
+                                <Eye className="h-4 w-4" />
+                              </ListIconLink>
+                              {canManageBoq(role) ? (
+                                <ListIconLink to={`/boq/${q._id}?mode=edit`} label="Edit">
+                                  <Pencil className="h-4 w-4" />
+                                </ListIconLink>
+                              ) : null}
                               {canDeleteQuotation(q.status, role, {
                                 isOwner: !user?.id || String(q.createdBy) === String(user.id),
                               }) ? (
@@ -243,9 +313,6 @@ function BoqPage() {
                                   <Trash2 className="h-4 w-4" />
                                 </ListIconButton>
                               ) : null}
-                              <ListIconLink to={`/boq/${q._id}`} label="Open">
-                                <Eye className="h-4 w-4" />
-                              </ListIconLink>
                             </ListActionRow>
                           </DataTableTd>
                         </DataTableRow>

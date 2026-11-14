@@ -10,7 +10,7 @@ import { TruncatedText } from "../../../components/TruncatedText";
 import { themeClasses } from "../../../theme/classes";
 import { googleCalendarEventUrl, siteVisitCalendarParamsFromInquiry } from "../calendarUtils";
 import type { Inquiry, InquiryStatus } from "../services/inquiryTypes";
-import { StatusBadge } from "./inquiryShared";
+import { SiteVisitBadge, StatusBadge } from "./inquiryShared";
 import { visitDateToInputValue } from "../mapUtils";
 
 const statusRowAccent: Record<InquiryStatus, string> = {
@@ -63,8 +63,9 @@ function VisitListTable({ visits }: VisitListTableProps) {
               <p className="mt-1 text-xs text-text-muted">
                 {item.category} · {visitDate} {item.scheduleVisitTime}
               </p>
-              <div className="mt-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <StatusBadge status={item.status} short />
+                <SiteVisitBadge item={item} />
               </div>
               <div className="mt-3">
                 <VisitRowActions item={item} />
@@ -83,6 +84,7 @@ function VisitListTable({ visits }: VisitListTableProps) {
               <DataTableTh>Category</DataTableTh>
               <DataTableTh>Visit</DataTableTh>
               <DataTableTh>Status</DataTableTh>
+              <DataTableTh>Site Visit</DataTableTh>
               <DataTableTh align="right">Action</DataTableTh>
             </DataTableHeadRow>
           </DataTableHeader>
@@ -143,6 +145,9 @@ function VisitListTable({ visits }: VisitListTableProps) {
                         />
                       </p>
                     ) : null}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3.5 align-top">
+                    <SiteVisitBadge item={item} />
                   </td>
                   <td className="px-4 py-3.5 align-top text-right">
                     <VisitRowActions item={item} />

@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 
 const MATERIAL_REQUEST_STATUSES = [
   "Pending",
@@ -34,6 +34,7 @@ const activityEntrySchema = new mongoose.Schema(
 const materialRequestSchema = new mongoose.Schema(
   {
     requestNumber: { type: String, required: true, unique: true, trim: true },
+    companyId: { type: String, default: "woodie-1", index: true },
     workOrderId: { type: mongoose.Schema.Types.ObjectId, ref: "WorkOrder", required: true },
     workOrderNumber: { type: String, required: true, trim: true },
     projectName: { type: String, required: true, trim: true },

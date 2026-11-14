@@ -4,6 +4,7 @@ export type TeamMemberStatus = "Active" | "Inactive";
 
 export type TeamMember = {
   _id: string;
+  companyId?: string;
   employeeId: string;
   name: string;
   phone: string;

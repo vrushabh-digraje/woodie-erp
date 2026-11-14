@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../features/auth/AuthContext";
 import type { UserRole } from "../features/auth/authTypes";
-import { defaultHomePath } from "../features/auth/permissions";
+import { defaultHomePath, isMasterAdmin } from "../features/auth/permissions";
 
 type ProtectedRouteProps = {
   allowedRoles?: UserRole[];
@@ -23,6 +23,11 @@ function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
+  // Master Super Admin has global super-admin access to all protected routes
+  if (isMasterAdmin(user.role)) {
+    return <Outlet />;
+  }
+
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to={defaultHomePath(user.role)} replace />;
   }
@@ -31,12 +36,3 @@ function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
 }
 
 export default ProtectedRoute;
-
-
-
-
-
-
-
-
-

@@ -58,7 +58,75 @@ export type FieldDashboardStats = {
   recentActivity: DashboardActivityItem[];
 };
 
-export type DashboardStats = OfficeDashboardStats | SalesDashboardStats | FieldDashboardStats;
+export type CompanyComparisonItem = {
+  id: string;
+  name: string;
+  inquiries: number;
+  quotations: number;
+  quotationValue: number;
+  workOrders: number;
+  activeWorkOrders: number;
+  revenue: number;
+};
+
+export type MasterDashboardStats = {
+  role: "master_admin";
+  companyFilter: string;
+  companies: { id: string; name: string; shortName?: string; legalName: string }[];
+  filters?: DashboardFiltersMeta;
+  summary: {
+    totalInquiries: number;
+    totalSiteVisits: number;
+    pendingVisits: number;
+    approvedVisits: number;
+    completedVisits: number;
+    totalQuotations: number;
+    pendingApprovalQuotations: number;
+    approvedQuotations: number;
+    wonQuotations: number;
+    quotationValueAed: number;
+    totalWorkOrders: number;
+    activeWorkOrders: number;
+    completedWorkOrders: number;
+    totalInvoicedAed: number;
+    totalPaidAed: number;
+  };
+  inquiryByStatus: StatusCountMap;
+  siteVisitBreakdown: StatusCountMap;
+  quotationByStatus: StatusCountMap;
+  workOrdersByStatus: StatusCountMap;
+  companyComparison: CompanyComparisonItem[];
+  recentActivity: DashboardActivityItem[];
+};
+
+export type DrilldownRecord = {
+  id: string;
+  number: string;
+  projectName: string;
+  clientName: string;
+  assignedPerson?: string;
+  status: string;
+  companyId: string;
+  companyName: string;
+  value?: number;
+  date?: string;
+  time?: string;
+  link: string;
+};
+
+export type DrilldownResponse = {
+  category: string;
+  status: string;
+  companyId: string;
+  total: number;
+  records: DrilldownRecord[];
+};
+
+export type DashboardStats =
+  | OfficeDashboardStats
+  | SalesDashboardStats
+  | FieldDashboardStats
+  | MasterDashboardStats;
 
 export async function fetchDashboardStats(params?: {
   location?: string;
@@ -68,6 +136,36 @@ export async function fetchDashboardStats(params?: {
     params: {
       location: params?.location ?? "all",
       period: params?.period ?? "year",
+    },
+  });
+  return response.data;
+}
+
+export async function fetchMasterDashboardStats(params?: {
+  companyId?: string;
+  period?: "month" | "year" | "all";
+  location?: string;
+}) {
+  const response = await api.get<MasterDashboardStats>("/dashboard/master", {
+    params: {
+      companyId: params?.companyId ?? "all",
+      period: params?.period ?? "year",
+      location: params?.location ?? "all",
+    },
+  });
+  return response.data;
+}
+
+export async function fetchMasterDrilldown(params: {
+  category: string;
+  status?: string;
+  companyId?: string;
+}) {
+  const response = await api.get<DrilldownResponse>("/dashboard/drilldown", {
+    params: {
+      category: params.category,
+      status: params.status ?? "all",
+      companyId: params.companyId ?? "all",
     },
   });
   return response.data;

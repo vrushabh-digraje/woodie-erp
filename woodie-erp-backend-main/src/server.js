@@ -4,6 +4,7 @@ const dotenv = require("dotenv");
 const path = require("path");
 const { connectDb } = require("./config/db");
 const { seedUsers } = require("./config/seedUsers");
+const { seedMultiCompanyUsers } = require("./config/seedMultiCompanyUsers");
 const inquiryRoutes = require("./routes/inquiryRoutes");
 const teamRoutes = require("./routes/teamRoutes");
 const authRoutes = require("./routes/authRoutes");
@@ -83,6 +84,7 @@ app.use((error, _req, res, _next) => {
 
 connectDb()
   .then(() => seedUsers())
+  .then(() => seedMultiCompanyUsers())
   .then(() => {
     startInvoiceFollowUpScheduler();
 

@@ -37,6 +37,7 @@ const activityEntrySchema = new mongoose.Schema(
 const invoiceSchema = new mongoose.Schema(
   {
     invoiceNumber: { type: String, required: true, unique: true, trim: true },
+    companyId: { type: String, default: "woodie-1", index: true },
     workOrderId: { type: mongoose.Schema.Types.ObjectId, ref: "WorkOrder", required: true },
     workOrderNumber: { type: String, required: true, trim: true },
     projectName: { type: String, trim: true, default: "" },

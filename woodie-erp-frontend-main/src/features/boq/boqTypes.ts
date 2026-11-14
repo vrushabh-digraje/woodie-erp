@@ -155,8 +155,17 @@ export type QuotationSiteInformation = {
 
 export type BoqQuotation = {
   _id: string;
+  companyId?: string;
   quotationNumber: string;
   projectName: string;
+  location?: string;
+  attn?: string;
+  emirates?: string;
+  clientRef?: string;
+  vendorTrn?: string;
+  subject?: string;
+  revision?: number;
+  quoteDate?: string | null;
   clientName: string;
   clientEmail: string;
   clientPhone: string;
@@ -192,6 +201,14 @@ export type BoqQuotation = {
 
 export type CreateQuotationPayload = {
   projectName?: string;
+  location?: string;
+  attn?: string;
+  emirates?: string;
+  clientRef?: string;
+  vendorTrn?: string;
+  subject?: string;
+  revision?: number;
+  quoteDate?: string | null;
   clientName?: string;
   clientEmail?: string;
   clientPhone?: string;

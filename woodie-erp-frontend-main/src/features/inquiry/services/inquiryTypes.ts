@@ -120,6 +120,7 @@ export type SiteReport = {
 
 export type Inquiry = {
   _id: string;
+  companyId?: string;
   inquiryNumber: string;
   clientName: string;
   contactPersonName?: string;
@@ -138,6 +139,9 @@ export type Inquiry = {
   status: InquiryStatus;
   /** True when a BOQ/quotation exists for this inquiry — locks site survey edits. */
   boqPrepared?: boolean;
+  boqId?: string;
+  boqNumber?: string;
+  boqStatus?: string;
   visitApproval: VisitApproval;
   siteReport?: SiteReport;
   activityTimeline: ActivityItem[];

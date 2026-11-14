@@ -1,9 +1,9 @@
 import type { CSSProperties } from "react";
-import { LogOut, X } from "lucide-react";
+import { Building2, LogOut, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { COLORS } from "../../constants/colors";
 import { useAuth } from "../../features/auth/AuthContext";
-import { roleLabel } from "../../features/auth/permissions";
+import { isMasterAdmin, roleLabel } from "../../features/auth/permissions";
 import SidebarLogo from "./SidebarLogo";
 import {
   isNavItemActive,
@@ -31,11 +31,12 @@ function navLinkStyle(active: boolean): CSSProperties {
 }
 
 export default function MobileNavDrawer({ active }: MobileNavDrawerProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, activeCompany, setActiveCompany } = useAuth();
   const { mobileMenuOpen, close } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
   const role = user?.role ?? "admin";
+  const isSuper = user ? isMasterAdmin(user.role) : false;
   const items = NAV_ITEMS.filter((n) => n.show(role));
   const initial = (user?.name ?? "U").charAt(0).toUpperCase();
 
@@ -70,6 +71,44 @@ export default function MobileNavDrawer({ active }: MobileNavDrawerProps) {
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {isSuper ? (
+          <div className="mx-3 mt-2 rounded-lg border border-slate-750 bg-slate-900/90 p-2 text-xs">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 mb-1.5">
+              <span className="flex items-center gap-1 text-brand-gold">
+                <Building2 className="h-3 w-3" />
+                Company
+              </span>
+              <span className="text-[10px] text-brand-gold font-mono uppercase">
+                {activeCompany === "all" ? "All" : activeCompany.replace("woodie-", "W")}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { id: "all", label: "All" },
+                { id: "woodie-1", label: "Woodie 1" },
+                { id: "woodie-2", label: "Woodie 2" },
+                { id: "woodie-3", label: "Woodie 3" },
+              ].map((co) => (
+                <button
+                  key={co.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveCompany(co.id);
+                    close();
+                  }}
+                  className={`rounded px-1.5 py-1 text-[11px] font-semibold transition text-center cursor-pointer ${
+                    activeCompany === co.id
+                      ? "bg-brand-gold text-slate-950 font-bold shadow-xs"
+                      : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white"
+                  }`}
+                >
+                  {co.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <nav className="flex-1 overflow-y-auto px-3 pb-4 pt-4">
           <div className="flex flex-col gap-0.5">

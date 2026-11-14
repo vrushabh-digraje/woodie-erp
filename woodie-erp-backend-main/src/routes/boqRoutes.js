@@ -17,6 +17,7 @@ const {
 const { downloadQuotationPdf, downloadRamsPdf } = require("../controllers/pdfController");
 const {
   sendQuotation,
+  toggleQuotationSubmission,
   markNegotiation,
   markWon,
   markLost,
@@ -44,6 +45,7 @@ router.post("/:id/approve", requireRoles(ROLES.ADMIN, ROLES.MANAGER, ROLES.PROCU
 router.post("/:id/reject", requireRoles(ROLES.ADMIN, ROLES.MANAGER, ROLES.PROCUREMENT), rejectQuotation);
 router.post("/:id/request-revision", requireRoles(ROLES.ADMIN, ROLES.MANAGER, ROLES.PROCUREMENT), requestRevision);
 router.patch("/:id/send", requireRoles(ROLES.ADMIN, ROLES.SALES), sendQuotation);
+router.patch("/:id/submission", requireRoles(ROLES.ADMIN, ROLES.SALES), toggleQuotationSubmission);
 router.patch("/:id/negotiation", requireRoles(ROLES.ADMIN, ROLES.SALES), markNegotiation);
 router.patch("/:id/won", requireRoles(ROLES.ADMIN, ROLES.SALES, ROLES.MANAGER, ROLES.PROCUREMENT), markWon);
 router.patch("/:id/lost", requireRoles(ROLES.ADMIN, ROLES.SALES, ROLES.MANAGER, ROLES.PROCUREMENT), markLost);

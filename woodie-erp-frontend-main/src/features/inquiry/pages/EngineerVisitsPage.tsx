@@ -19,7 +19,7 @@ import type { Inquiry, InquiryStatus } from "../services/inquiryTypes";
 const STATUS_FILTERS: { value: InquiryStatus | "All"; label: string }[] = [
   { value: "All", label: "All statuses" },
   { value: "Visit Pending Approval", label: "Pending approval" },
-  { value: "Visit Approved", label: "Approved" },
+  { value: "Visit Approved", label: "Accepted" },
   { value: "Visit Rejected", label: "Rejected" },
   { value: "Site Report Attached", label: "Report attached" },
 ];
@@ -50,7 +50,7 @@ function EngineerVisitsPage() {
     () => visits.filter((v) => v.status === "Visit Pending Approval").length,
     [visits],
   );
-  const approvedCount = useMemo(() => visits.filter((v) => v.status === "Visit Approved").length, [visits]);
+  const acceptedCount = useMemo(() => visits.filter((v) => v.status === "Visit Approved").length, [visits]);
   const completedCount = useMemo(
     () => visits.filter((v) => v.status === "Site Report Attached").length,
     [visits],
@@ -61,7 +61,7 @@ function EngineerVisitsPage() {
       <div className="space-y-6">
           <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             <InquiryStatCard title="Pending" value={String(pendingCount)} detail="Needs your decision" icon={Clock} />
-            <InquiryStatCard title="Approved" value={String(approvedCount)} detail="Ready for survey" icon={CalendarCheck} />
+            <InquiryStatCard title="Accepted" value={String(acceptedCount)} detail="Ready for survey" icon={CalendarCheck} />
             <InquiryStatCard title="Completed" value={String(completedCount)} detail="Report submitted" icon={FileCheck2} />
             <InquiryStatCard title="Total" value={String(visits.length)} detail="Assigned to you" icon={ClipboardCheck} />
           </section>

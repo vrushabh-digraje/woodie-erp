@@ -1,7 +1,6 @@
 const { TeamMember } = require("../models/TeamMember");
 const { signToken } = require("../middleware/auth");
-const { isActiveMember } = require("../config/rbac");
-const { ROLE_OPTIONS } = require("../config/rbac");
+const { isActiveMember, ROLE_OPTIONS } = require("../config/rbac");
 
 function toPublicUser(member) {
   return {
@@ -10,6 +9,7 @@ function toPublicUser(member) {
     email: member.email,
     phone: member.phone,
     role: member.role,
+    companyId: member.companyId || (member.role === "master_admin" ? null : "woodie-1"),
     employeeId: member.employeeId,
     status: member.status,
   };

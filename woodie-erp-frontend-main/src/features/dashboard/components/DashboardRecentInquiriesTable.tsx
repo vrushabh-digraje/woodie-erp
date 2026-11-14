@@ -3,7 +3,11 @@ import { ArrowUpRight } from "lucide-react";
 import { COLORS } from "../../../constants/colors";
 import { panelSurface, tableHeadSurface, viewAllLinkStyle } from "../../../constants/surfaces";
 import type { Inquiry } from "../../inquiry/services/inquiryTypes";
-import { inquiryStatusShortLabel } from "../../inquiry/components/inquiryShared";
+import {
+  inquiryStatusShortLabel,
+  SiteVisitBadge,
+  BoqStatusBadge,
+} from "../../inquiry/components/inquiryShared";
 import { inquiryStatusBadgeColors } from "../dashboardStatusBadge";
 import DashboardSectionHeader from "./DashboardSectionHeader";
 
@@ -53,7 +57,7 @@ export default function DashboardRecentInquiriesTable({
             <table className="w-full min-w-full text-left text-sm">
               <thead>
                 <tr style={tableHeadSurface()}>
-                  {["Client", "Inquiry", "Category", "Status"].map((col) => (
+                  {["Client", "Inquiry", "Category", "Status", "Site Visit", "BOQ Status"].map((col) => (
                     <th
                       key={col}
                       className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.08em] first:pl-5 last:pr-5"
@@ -106,6 +110,12 @@ export default function DashboardRecentInquiriesTable({
                         >
                           {inquiryStatusShortLabel(row.status)}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 first:pl-5 last:pr-5">
+                        <SiteVisitBadge item={row} />
+                      </td>
+                      <td className="px-4 py-3 first:pl-5 last:pr-5">
+                        <BoqStatusBadge item={row} />
                       </td>
                     </tr>
                   );

@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 
 const MATERIAL_UNITS = ["nos", "sqm", "rm", "kg", "ltr", "box"];
 
@@ -17,6 +17,7 @@ const stockTransactionSchema = new mongoose.Schema(
 const materialSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
+    companyId: { type: String, default: "woodie-1", index: true },
     SKU: { type: String, required: true, unique: true, trim: true, uppercase: true },
     unit: { type: String, enum: MATERIAL_UNITS, required: true },
     currentStock: { type: Number, default: 0, min: 0 },

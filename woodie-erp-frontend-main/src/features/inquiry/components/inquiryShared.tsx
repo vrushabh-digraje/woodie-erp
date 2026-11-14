@@ -1,7 +1,9 @@
 import type { ComponentType } from "react";
 import { CheckCircle2, CircleDashed, CircleX, Sparkles } from "lucide-react";
 import { AppStatCard } from "../../../components/ui/AppStatCard";
-import type { ActivityItem, InquiryStatus } from "../services/inquiryTypes";
+import { Link } from "react-router-dom";
+import type { ActivityItem, InquiryStatus, Inquiry, SiteReport } from "../services/inquiryTypes";
+import { getBoqDisplayStatus } from "../../boq/boqShared";
 
 export const EMPTY_DISPLAY = "-";
 
@@ -11,12 +13,12 @@ export function displayOrEmpty(value: string | undefined | null): string {
 }
 
 const statusShort: Record<InquiryStatus, string> = {
-  "Visit Pending Approval": "New",
-  "Visit Approved": "Estimated",
+  "Visit Pending Approval": "Pending",
+  "Visit Approved": "Accepted",
   "Visit Rejected": "Rejected",
-  "Site Report Attached": "Approved",
-  Won: "Won",
-  Lost: "Lost",
+  "Site Report Attached": "Accepted",
+  Won: "Accepted",
+  Lost: "Rejected",
 };
 
 export function inquiryStatusShortLabel(status: InquiryStatus | string): string {
@@ -25,30 +27,102 @@ export function inquiryStatusShortLabel(status: InquiryStatus | string): string 
 }
 
 export function inquiryStatusPillClass(status: InquiryStatus | string): string {
-  const base = "inline-flex shrink-0 max-w-full rounded-full px-2.5 py-0.5 text-xs font-semibold";
+  const base = "inline-flex shrink-0 max-w-full rounded-full px-2.5 py-0.5 text-xs font-semibold border";
   switch (status) {
     case "Visit Pending Approval":
-      return `${base} pill-new`;
+      return `${base} bg-amber-50 text-amber-700 border-amber-200`;
     case "Visit Approved":
-      return `${base} pill-estimated`;
     case "Site Report Attached":
-      return `${base} pill-approved`;
     case "Won":
-      return `${base} bg-emerald-100 text-emerald-800`;
+      return `${base} bg-emerald-50 text-emerald-700 border-emerald-200`;
     case "Lost":
     case "Visit Rejected":
-      return `${base} bg-rose-100 text-rose-800`;
+      return `${base} bg-rose-50 text-rose-700 border-rose-200`;
     default:
-      return `${base} bg-slate-100 text-slate-700`;
+      return `${base} bg-slate-100 text-slate-700 border-slate-200`;
   }
 }
 
 export function StatusBadge({ status, short }: { status: InquiryStatus | string; short?: boolean }) {
-  const label = short ? inquiryStatusShortLabel(status) : String(status || "Unknown");
+  const label =
+    short || status === "Visit Approved"
+      ? inquiryStatusShortLabel(status)
+      : String(status || "Unknown");
   return (
     <span className={inquiryStatusPillClass(status)} title={String(status)}>
       {label}
     </span>
+  );
+}
+
+export function isVisitAccepted(status: InquiryStatus | string): boolean {
+  return (
+    status === "Visit Approved" ||
+    status === "Accepted" ||
+    status === "Site Report Attached" ||
+    status === "Won"
+  );
+}
+
+export function isSiteVisitDone(item: { status: InquiryStatus | string; siteReport?: SiteReport }): boolean {
+  if (item.status === "Site Report Attached" || item.status === "Won") return true;
+  if (item.siteReport?.reportSubmittedAt) return true;
+  if (item.siteReport?.scopes && item.siteReport.scopes.length > 0) {
+    return item.siteReport.scopes.some(
+      (s) => Boolean(s.workItems && s.workItems.length > 0) || Boolean(s.measurements && s.measurements.length > 0)
+    );
+  }
+  return false;
+}
+
+export function SiteVisitBadge({ item }: { item: Inquiry }) {
+  if (!isVisitAccepted(item.status)) {
+    return <span className="text-text-muted font-mono text-xs">—</span>;
+  }
+  const done = isSiteVisitDone(item);
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
+        done
+          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+          : "bg-amber-50 text-amber-700 border-amber-200"
+      }`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${done ? "bg-emerald-500" : "bg-amber-500"}`} />
+      {done ? "Site Visit Done" : "Pending"}
+    </span>
+  );
+}
+
+export function BoqStatusBadge({ item }: { item: Inquiry }) {
+  const hasBoq = Boolean(item.boqId || item.boqStatus || item.boqPrepared);
+  const visitDone = isVisitAccepted(item.status) && isSiteVisitDone(item);
+  const targetUrl = item.boqId ? `/boq/${item.boqId}` : "/boq";
+
+  if (!hasBoq && !visitDone) {
+    return (
+      <Link
+        to="/boq"
+        title="Open BOQ tool"
+        className="text-text-muted hover:text-ui-primary font-mono text-xs transition cursor-pointer hover:underline px-1 py-0.5"
+      >
+        —
+      </Link>
+    );
+  }
+
+  const rawStatus = item.boqStatus || (item.boqPrepared ? "Approved" : "Pending");
+  const display = getBoqDisplayStatus(rawStatus);
+
+  return (
+    <Link
+      to={targetUrl}
+      title={item.boqId ? `Open BOQ: ${item.boqNumber || "Quotation"}` : "Open BOQ tool"}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold transition cursor-pointer hover:opacity-90 ${display.className}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${display.dotClassName || "bg-current"}`} />
+      {display.label}
+    </Link>
   );
 }
 
@@ -81,7 +155,7 @@ export function WorkflowTimeline({ status }: { status: InquiryStatus }) {
     : [
         { label: "Created", done: true },
         {
-          label: status === "Visit Rejected" ? "Rejected" : "Approval",
+          label: status === "Visit Rejected" ? "Rejected" : "Accepted",
           done: status !== "Visit Pending Approval",
           rejected: status === "Visit Rejected",
         },

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Plus, Search } from "lucide-react";
 import AppShell from "../../components/layout/AppShell";
+import { useAuth } from "../auth/AuthContext";
 import {
   DataTable,
   DataTableBody,
@@ -24,6 +25,7 @@ const STATUS_CHIPS: Array<InvoiceStatus | "All"> = ["All", ...INVOICE_STATUSES];
 const TYPE_OPTIONS: Array<InvoiceType | "All"> = ["All", ...INVOICE_TYPES];
 
 function InvoiceListPage() {
+  const { activeCompany } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "All">("All");
@@ -51,7 +53,7 @@ function InvoiceListPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, typeFilter, search, page, notifyErr]);
+  }, [statusFilter, typeFilter, search, page, notifyErr, activeCompany]);
 
   useEffect(() => {
     void load();
@@ -59,7 +61,7 @@ function InvoiceListPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, typeFilter, search]);
+  }, [statusFilter, typeFilter, search, activeCompany]);
 
   return (
     <AppShell activeNav="finance" pageTitle="Invoices" pageSubtitle="Billing & collections">
@@ -139,6 +141,7 @@ function InvoiceListPage() {
             <DataTable>
               <DataTableHeader>
                 <DataTableHeadRow>
+                  <DataTableTh>Company</DataTableTh>
                   <DataTableTh>INV#</DataTableTh>
                   <DataTableTh>WO#</DataTableTh>
                   <DataTableTh>Client</DataTableTh>
@@ -155,6 +158,19 @@ function InvoiceListPage() {
                   const overdue = isInvoiceOverdue(inv.dueDate, inv.status);
                   return (
                     <DataTableRow key={inv._id} className={overdue ? "bg-rose-50/60" : undefined}>
+                      <DataTableTd className="whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold border ${
+                            inv.companyId === "woodie-2"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : inv.companyId === "woodie-3"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : "bg-blue-50 text-blue-800 border-blue-200"
+                          }`}
+                        >
+                          {inv.companyId === "woodie-2" ? "Woodie 2" : inv.companyId === "woodie-3" ? "Woodie 3" : "Woodie 1"}
+                        </span>
+                      </DataTableTd>
                       <DataTableTd className="font-mono text-xs font-medium">{inv.invoiceNumber}</DataTableTd>
                       <DataTableTd>{inv.workOrderNumber}</DataTableTd>
                       <DataTableTd>{inv.clientName}</DataTableTd>

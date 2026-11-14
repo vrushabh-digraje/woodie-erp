@@ -3,7 +3,7 @@ import type { PaginatedResponse } from "../../lib/pagination";
 import type { BoqQuotation, CreateQuotationPayload, QuotationStatus, UpdateQuotationPayload } from "./boqTypes";
 import type { RamsPayload } from "./ramsPresets";
 
-export async function getQuotations(search = "", status: QuotationStatus | "All" = "All") {
+export async function getQuotations(search = "", status: QuotationStatus | string = "All") {
   const response = await api.get<BoqQuotation[]>("/boq/quotations", {
     params: { q: search, status },
   });
@@ -12,7 +12,7 @@ export async function getQuotations(search = "", status: QuotationStatus | "All"
 
 export async function getQuotationsPage(
   search = "",
-  status: QuotationStatus | "All" = "All",
+  status: QuotationStatus | string = "All",
   page = 1,
   pageSize = 20,
 ) {
@@ -142,3 +142,12 @@ export async function markLost(id: string, lossReason: string) {
 export async function deleteQuotation(id: string): Promise<void> {
   await api.delete(`/boq/quotations/${id}`);
 }
+
+export async function toggleQuotationSubmission(id: string, submitted?: boolean) {
+  const response = await api.patch<{ success: boolean; data: BoqQuotation; message: string }>(
+    `/boq/quotations/${id}/submission`,
+    submitted !== undefined ? { submitted } : {},
+  );
+  return response.data.data;
+}
+

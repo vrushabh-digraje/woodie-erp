@@ -211,8 +211,62 @@ async function markLost(req, res) {
   }
 }
 
+async function toggleQuotationSubmission(req, res) {
+  try {
+    const doc = await loadQuotation(req);
+    const ownershipError = assertSalesOwnership(doc, req.user);
+    if (ownershipError) {
+      return res.status(403).json({ success: false, message: ownershipError });
+    }
+
+    const isCurrentlySubmitted = Boolean(
+      doc.sentAt || ["Quotation Sent", "Negotiation", "Won"].includes(doc.status),
+    );
+    const targetSubmitted =
+      req.body.submitted !== undefined
+        ? Boolean(req.body.submitted)
+        : !isCurrentlySubmitted;
+
+    if (targetSubmitted) {
+      doc.sentAt = new Date();
+      if (doc.status === "Approved") {
+        doc.status = "Quotation Sent";
+      }
+      doc.activityTimeline.unshift(
+        activity("Quotation Submitted", "Quotation marked as submitted to client", actorName(req)),
+      );
+    } else {
+      doc.sentAt = null;
+      if (doc.status === "Quotation Sent") {
+        doc.status = "Approved";
+      }
+      doc.activityTimeline.unshift(
+        activity("Quotation Unsubmitted", "Quotation marked as not submitted", actorName(req)),
+      );
+    }
+
+    await doc.save();
+    return res.json({
+      success: true,
+      data: doc,
+      message: targetSubmitted
+        ? "Quotation marked as submitted to client."
+        : "Quotation marked as not submitted.",
+    });
+  } catch (error) {
+    if (error.statusCode === 404) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update quotation submission status",
+    });
+  }
+}
+
 module.exports = {
   sendQuotation,
+  toggleQuotationSubmission,
   markNegotiation,
   markWon,
   markLost,

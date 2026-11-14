@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 
 const WORK_ORDER_STATUSES = [
   "Scheduled",
@@ -78,12 +78,14 @@ const activitySchema = new mongoose.Schema(
 const workOrderSchema = new mongoose.Schema(
   {
     workOrderNumber: { type: String, required: true, unique: true, trim: true },
+    companyId: { type: String, default: "woodie-1", index: true },
     inquiryId: { type: mongoose.Schema.Types.ObjectId, ref: "Inquiry", required: true },
     quotationId: { type: mongoose.Schema.Types.ObjectId, ref: "BoqQuotation", required: true, unique: true },
     projectName: { type: String, required: true, trim: true },
     clientName: { type: String, required: true, trim: true },
     clientPhone: { type: String, trim: true, default: "" },
     clientEmail: { type: String, trim: true, default: "" },
+    clientRef: { type: String, trim: true, default: "" },
     siteAddress: { type: String, trim: true, default: "" },
     scopeOfWork: { type: String, trim: true, default: "" },
     approvedAmount: { type: Number, min: 0, default: 0 },

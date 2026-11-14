@@ -1,4 +1,5 @@
 const { Material, MATERIAL_UNITS } = require("../models/Material");
+const { buildTenantFilter } = require("../middleware/tenantIsolation");
 
 function actorName(req) {
   return req.user?.name || "System";
@@ -25,7 +26,8 @@ async function listMaterials(req, res) {
       ];
     }
 
-    const data = await Material.find(filter).sort({ name: 1 });
+    const scopedFilter = buildTenantFilter(req, filter);
+    const data = await Material.find(scopedFilter).sort({ name: 1 });
     return res.json(data);
   } catch (error) {
     return res.status(500).json({ message: error.message || "Failed to list materials" });
@@ -57,9 +59,11 @@ async function createMaterial(req, res) {
     const dup = await Material.findOne({ SKU });
     if (dup) return res.status(400).json({ message: "SKU already exists" });
 
+    const companyId = req.companyId || (req.user?.companyId || "woodie-1");
     const doc = await Material.create({
       name,
       SKU,
+      companyId,
       unit,
       currentStock: Math.max(0, Number(req.body?.currentStock) || 0),
       minStockLevel: Math.max(0, Number(req.body?.minStockLevel) || 0),

@@ -178,8 +178,8 @@ function RoleDashboardPage() {
     }
 
     if (user.role === ROLES.SALES && isSalesStats(stats)) {
-      const myInquiryTotal = Object.values(stats.myInquiriesByStatus).reduce((s, n) => s + n, 0);
-      const myQuotationTotal = Object.values(stats.myQuotationsByStatus).reduce((s, n) => s + n, 0);
+      const myInquiryTotal = Object.values(stats.myInquiriesByStatus ?? {}).reduce((s, n) => s + n, 0);
+      const myQuotationTotal = Object.values(stats.myQuotationsByStatus ?? {}).reduce((s, n) => s + n, 0);
 
       const cards: StatCardData[] = [
         {
