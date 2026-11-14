@@ -504,8 +504,8 @@ async function decideVisitApproval(req, res) {
   inquiry.status = decision === "Approved" ? "Visit Approved" : "Visit Rejected";
   inquiry.activityTimeline.unshift(
     createActivity(
-      decision === "Approved" ? "Visit Approved" : "Visit Rejected",
-      decision === "Rejected" ? inquiry.visitApproval.rejectionReason : "Visit approved",
+      decision === "Approved" ? "Visit Accepted" : "Visit Rejected",
+      decision === "Rejected" ? inquiry.visitApproval.rejectionReason : "Site visit accepted by engineer",
       activityActor(req),
     ),
   );

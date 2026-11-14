@@ -122,7 +122,7 @@ function InquiryListingPage() {
       <div className="space-y-4">
         <section className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
           <InquiryStatCard title="Total" value={String(total)} detail="All inquiries" icon={FolderSearch} iconIndex={0} />
-          <InquiryStatCard title="Pending" value={String(pendingCount)} detail="Awaiting decision" icon={UserCheck} iconIndex={1} />
+          <InquiryStatCard title="Acceptance Pending" value={String(pendingCount)} detail="Awaiting decision" icon={UserCheck} iconIndex={1} />
           <InquiryStatCard title="Accepted" value={String(acceptedCount)} detail={`${rejectedCount} rejected`} icon={FolderSearch} iconIndex={2} />
         </section>
 
@@ -157,8 +157,12 @@ function InquiryListingPage() {
                       : s === "Visit Rejected"
                         ? "Rejected"
                         : s === "Visit Pending Approval"
-                          ? "Pending"
-                          : s}
+                          ? "Site visit acceptance pending"
+                          : s === "Site Report Attached"
+                            ? "Done"
+                            : s === "All"
+                              ? "All statuses"
+                              : s}
                   </option>
                 ))}
               </select>

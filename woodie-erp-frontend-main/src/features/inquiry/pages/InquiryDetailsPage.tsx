@@ -70,7 +70,7 @@ function InquiryDetailsPage() {
         rejectionReason: approvalDecision === "Rejected" ? rejectionReason : "",
       });
       setInquiry(updated);
-      notifyOk(approvalDecision === "Approved" ? "Visit approved." : "Visit rejected.");
+      notifyOk(approvalDecision === "Approved" ? "Site visit accepted." : "Site visit rejected.");
     } catch (err: unknown) {
       notifyErr(err, "Failed to submit decision.");
     }
@@ -80,8 +80,10 @@ function InquiryDetailsPage() {
     "Inquiry Created",
     "Visit Assigned",
     "Visit Approved",
+    "Visit Accepted",
     "Visit Rejected",
     "Site Report Uploaded",
+    "Site Report Attached",
   ]);
   const timeline = (inquiry?.activityTimeline ?? []).filter((a) => TIMELINE_ACTIONS.has(a.action));
 

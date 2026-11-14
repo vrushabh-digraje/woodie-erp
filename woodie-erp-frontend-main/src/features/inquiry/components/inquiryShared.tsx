@@ -13,16 +13,20 @@ export function displayOrEmpty(value: string | undefined | null): string {
 }
 
 const statusShort: Record<InquiryStatus, string> = {
-  "Visit Pending Approval": "Pending",
+  "Visit Pending Approval": "Site visit acceptance pending",
   "Visit Approved": "Accepted",
   "Visit Rejected": "Rejected",
-  "Site Report Attached": "Accepted",
-  Won: "Accepted",
-  Lost: "Rejected",
+  "Site Report Attached": "Done",
+  Won: "Won",
+  Lost: "Lost",
 };
 
 export function inquiryStatusShortLabel(status: InquiryStatus | string): string {
   if (status in statusShort) return statusShort[status as InquiryStatus];
+  if (status === "Visit Pending Approval") return "Site visit acceptance pending";
+  if (status === "Visit Approved") return "Accepted";
+  if (status === "Visit Rejected") return "Rejected";
+  if (status === "Site Report Attached") return "Done";
   return String(status || "Unknown");
 }
 
@@ -30,24 +34,27 @@ export function inquiryStatusPillClass(status: InquiryStatus | string): string {
   const base = "inline-flex shrink-0 max-w-full rounded-full px-2.5 py-0.5 text-xs font-semibold border";
   switch (status) {
     case "Visit Pending Approval":
+    case "Site visit acceptance pending":
       return `${base} bg-amber-50 text-amber-700 border-amber-200`;
     case "Visit Approved":
+    case "Accepted":
+      return `${base} bg-emerald-50 text-emerald-700 border-emerald-200`;
     case "Site Report Attached":
+    case "Done":
+      return `${base} bg-blue-50 text-blue-700 border-blue-200`;
     case "Won":
       return `${base} bg-emerald-50 text-emerald-700 border-emerald-200`;
     case "Lost":
     case "Visit Rejected":
+    case "Rejected":
       return `${base} bg-rose-50 text-rose-700 border-rose-200`;
     default:
       return `${base} bg-slate-100 text-slate-700 border-slate-200`;
   }
 }
 
-export function StatusBadge({ status, short }: { status: InquiryStatus | string; short?: boolean }) {
-  const label =
-    short || status === "Visit Approved"
-      ? inquiryStatusShortLabel(status)
-      : String(status || "Unknown");
+export function StatusBadge({ status }: { status: InquiryStatus | string; short?: boolean }) {
+  const label = inquiryStatusShortLabel(status);
   return (
     <span className={inquiryStatusPillClass(status)} title={String(status)}>
       {label}
@@ -89,7 +96,7 @@ export function SiteVisitBadge({ item }: { item: Inquiry }) {
       }`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${done ? "bg-emerald-500" : "bg-amber-500"}`} />
-      {done ? "Site Visit Done" : "Pending"}
+      {done ? "Done" : "Pending"}
     </span>
   );
 }

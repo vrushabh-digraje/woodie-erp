@@ -85,20 +85,34 @@ function CompanyBadge({ companyId }: { companyId: string }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  let display = status;
   let color = "bg-slate-100 text-slate-700 border-slate-200";
+
   if (["Approved", "Won", "Completed", "Handed Over"].includes(status)) {
     color = "bg-emerald-50 text-emerald-700 border-emerald-200";
-  } else if (["Pending Approval", "Visit Pending Approval", "In Progress"].includes(status)) {
+  } else if (status === "Visit Approved" || status === "Accepted") {
+    display = "Accepted";
+    color = "bg-emerald-50 text-emerald-700 border-emerald-200";
+  } else if (status === "Visit Pending Approval" || status === "Site visit acceptance pending") {
+    display = "Site visit acceptance pending";
     color = "bg-amber-50 text-amber-800 border-amber-200";
-  } else if (["Rejected", "Lost", "Cancelled"].includes(status)) {
+  } else if (["Pending Approval", "In Progress"].includes(status)) {
+    color = "bg-amber-50 text-amber-800 border-amber-200";
+  } else if (status === "Visit Rejected" || status === "Rejected") {
+    display = "Rejected";
     color = "bg-rose-50 text-rose-700 border-rose-200";
-  } else if (["Site Report Attached", "Scheduled"].includes(status)) {
+  } else if (["Lost", "Cancelled"].includes(status)) {
+    color = "bg-rose-50 text-rose-700 border-rose-200";
+  } else if (status === "Site Report Attached" || status === "Done") {
+    display = "Done";
+    color = "bg-blue-50 text-blue-700 border-blue-200";
+  } else if (["Scheduled"].includes(status)) {
     color = "bg-blue-50 text-blue-700 border-blue-200";
   }
 
   return (
     <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium border ${color}`}>
-      {status}
+      {display}
     </span>
   );
 }

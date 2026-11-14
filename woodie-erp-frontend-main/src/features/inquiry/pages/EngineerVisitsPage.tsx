@@ -18,10 +18,10 @@ import type { Inquiry, InquiryStatus } from "../services/inquiryTypes";
 
 const STATUS_FILTERS: { value: InquiryStatus | "All"; label: string }[] = [
   { value: "All", label: "All statuses" },
-  { value: "Visit Pending Approval", label: "Pending approval" },
+  { value: "Visit Pending Approval", label: "Site visit acceptance pending" },
   { value: "Visit Approved", label: "Accepted" },
   { value: "Visit Rejected", label: "Rejected" },
-  { value: "Site Report Attached", label: "Report attached" },
+  { value: "Site Report Attached", label: "Done" },
 ];
 
 const filterSelectClass =
@@ -60,9 +60,9 @@ function EngineerVisitsPage() {
     <AppShell activeNav="inquiries" pageTitle="My Site Visits" pageSubtitle="Assigned field visits">
       <div className="space-y-6">
           <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            <InquiryStatCard title="Pending" value={String(pendingCount)} detail="Needs your decision" icon={Clock} />
+            <InquiryStatCard title="Acceptance Pending" value={String(pendingCount)} detail="Needs your decision" icon={Clock} />
             <InquiryStatCard title="Accepted" value={String(acceptedCount)} detail="Ready for survey" icon={CalendarCheck} />
-            <InquiryStatCard title="Completed" value={String(completedCount)} detail="Report submitted" icon={FileCheck2} />
+            <InquiryStatCard title="Done" value={String(completedCount)} detail="Report submitted" icon={FileCheck2} />
             <InquiryStatCard title="Total" value={String(visits.length)} detail="Assigned to you" icon={ClipboardCheck} />
           </section>
 
