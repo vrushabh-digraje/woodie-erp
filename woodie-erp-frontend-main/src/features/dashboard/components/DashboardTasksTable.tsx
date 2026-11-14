@@ -44,7 +44,7 @@ const rowAction: Partial<Record<InquiryStatus, { label: string; className: strin
     className: "bg-surface-muted text-text-secondary hover:bg-surface-border-light",
   },
   Won: {
-    label: "View won",
+    label: "View done",
     className: "bg-emerald-100 text-emerald-800 hover:opacity-90",
   },
   Lost: {

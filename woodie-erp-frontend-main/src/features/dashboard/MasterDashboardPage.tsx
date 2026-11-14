@@ -89,6 +89,7 @@ function StatusBadge({ status }: { status: string }) {
   let color = "bg-slate-100 text-slate-700 border-slate-200";
 
   if (["Approved", "Won", "Completed", "Handed Over"].includes(status)) {
+    if (status === "Won") display = "Done";
     color = "bg-emerald-50 text-emerald-700 border-emerald-200";
   } else if (status === "Visit Approved" || status === "Accepted") {
     display = "Accepted";

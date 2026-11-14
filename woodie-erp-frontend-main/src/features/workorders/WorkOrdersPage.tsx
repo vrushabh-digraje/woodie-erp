@@ -83,13 +83,13 @@ function WorkOrdersPage() {
     <AppShell
       activeNav="workorders"
       pageTitle={isFieldRole(role) ? "My jobs" : "Work Orders"}
-      pageSubtitle={isFieldRole(role) ? "Work orders assigned to you" : "Jobs created from won quotations"}
+      pageSubtitle={isFieldRole(role) ? "Work orders assigned to you" : "Jobs created from approved quotations"}
     >
       <BoqFeedbackPopup msg={msg} onDismiss={dismiss} />
       <ConfirmDeleteModal
         open={Boolean(deleteTarget)}
         title="Delete work order?"
-        description="Only unused scheduled work orders can be removed. The won quotation stays — you can create a new work order later."
+        description="Only unused scheduled work orders can be removed. The quotation stays — you can create a new work order later."
         itemLabel={deleteTarget ? `${deleteTarget.workOrderNumber} · ${deleteTarget.projectName}` : ""}
         loading={deleteBusy}
         onCancel={() => setDeleteTarget(null)}
@@ -102,7 +102,7 @@ function WorkOrdersPage() {
               <h2 className={themeClasses.sectionTitle}>All work orders</h2>
               {canManageWorkOrders(role) ? (
                 <p className="mt-1 text-sm text-text-muted">
-                  Create a work order from a won quotation on the BOQ detail page.
+                  Create a work order from an approved quotation on the BOQ detail page.
                 </p>
               ) : null}
             </div>
@@ -143,7 +143,7 @@ function WorkOrdersPage() {
             <div className="rounded-xl border border-dashed border-surface-border bg-surface-muted/50 px-6 py-12 text-center">
               <p className="text-sm font-medium text-text-primary">No work orders yet</p>
               <p className="mt-1 text-xs text-text-muted">
-                Mark a quotation as Won, then create a work order from its detail page.
+                Mark a quotation as Done, then create a work order from its detail page.
               </p>
             </div>
           ) : (

@@ -739,7 +739,7 @@ function QuotationDetailPage() {
 
   function handleConfirmWon() {
     if (!id) return;
-    void runNegotiationAction("won", () => markWon(id), "Quotation marked as won.");
+    void runNegotiationAction("won", () => markWon(id), "Quotation marked as done.");
   }
 
   function handleConfirmLost() {
@@ -1526,10 +1526,10 @@ function ClientNegotiationPanel({
     return (
       <SectionCard title="Client outcome" icon={CircleDollarSign}>
         <p className="mb-3 text-sm leading-relaxed text-text-muted">
-          Quotation won. A work order is created automatically — open it below to assign the team and start execution.
+          Quotation marked as done. A work order is created automatically — open it below to assign the team and start execution.
         </p>
         <span className="inline-flex rounded-md bg-green-100 px-3 py-1.5 text-sm font-semibold text-green-700">
-          Won ✓
+          Done ✓
         </span>
         {linkedWorkOrder ? (
           <div className="mt-4 min-w-0 rounded-lg border border-surface-border-light bg-surface-muted/30 p-3">
@@ -1600,7 +1600,7 @@ function ClientNegotiationPanel({
           loading={actionLoading === "won"}
           onClick={onOpenWon}
         >
-          Mark Won
+          Mark as Done
         </ActionButton>
         {showNegotiationButton ? (
           <ActionButton

@@ -294,30 +294,6 @@ async function seedDemoCompanyData(companyId, companyName) {
   recalculateTotals(quot1);
   await quot1.save();
 
-  // Work Order 1
-  await WorkOrder.create({
-    workOrderNumber: `WO-${prefix}-1001`,
-    companyId,
-    inquiryId: inq1._id,
-    quotationId: quot1._id,
-    projectName: quot1.projectName,
-    clientName: quot1.clientName,
-    clientPhone: quot1.clientPhone,
-    siteAddress: inq1.fullAddress,
-    scopeOfWork: quot1.subject,
-    approvedAmount: quot1.grandTotal,
-    status: "In Progress",
-    scheduledStart: new Date(),
-    targetCompletion: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    assignedTeam: assigned
-      ? [{ memberId: assigned._id, name: assigned.name, role: assigned.role, phone: assigned.phone }]
-      : [],
-    activityTimeline: [
-      { action: "In Progress", note: "Site mobilization and MEP work commenced", createdBy: "Supervisor", createdAt: new Date() },
-      { action: "Work Order Created", note: "Created from approved quotation", createdBy: "System", createdAt: new Date() },
-    ],
-  });
-
   // Inquiry 2 (Pending visit approval)
   await Inquiry.create({
     inquiryNumber: `INQ-${prefix}-1002`,

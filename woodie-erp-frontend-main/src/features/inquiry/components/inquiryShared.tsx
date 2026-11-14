@@ -17,7 +17,7 @@ const statusShort: Record<InquiryStatus, string> = {
   "Visit Approved": "Accepted",
   "Visit Rejected": "Rejected",
   "Site Report Attached": "Done",
-  Won: "Won",
+  Won: "Done",
   Lost: "Lost",
 };
 
@@ -26,7 +26,7 @@ export function inquiryStatusShortLabel(status: InquiryStatus | string): string 
   if (status === "Visit Pending Approval") return "Site visit acceptance pending";
   if (status === "Visit Approved") return "Accepted";
   if (status === "Visit Rejected") return "Rejected";
-  if (status === "Site Report Attached") return "Done";
+  if (status === "Site Report Attached" || status === "Won") return "Done";
   return String(status || "Unknown");
 }
 
@@ -41,7 +41,6 @@ export function inquiryStatusPillClass(status: InquiryStatus | string): string {
       return `${base} bg-emerald-50 text-emerald-700 border-emerald-200`;
     case "Site Report Attached":
     case "Done":
-      return `${base} bg-blue-50 text-blue-700 border-blue-200`;
     case "Won":
       return `${base} bg-emerald-50 text-emerald-700 border-emerald-200`;
     case "Lost":
@@ -157,7 +156,7 @@ export function WorkflowTimeline({ status }: { status: InquiryStatus }) {
     ? [
         { label: "Created", done: true },
         { label: "Site visit", done: true },
-        { label: status === "Won" ? "Won" : "Lost", done: true, rejected: status === "Lost" },
+        { label: status === "Won" ? "Done" : "Lost", done: true, rejected: status === "Lost" },
       ]
     : [
         { label: "Created", done: true },
