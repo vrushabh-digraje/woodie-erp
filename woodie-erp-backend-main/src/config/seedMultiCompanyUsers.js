@@ -73,6 +73,15 @@ const SEEDED_ACCOUNTS = [
     role: ROLES.SITE_ENGINEER,
     companyId: "woodie-1",
   },
+  {
+    employeeId: "W1-0007",
+    name: "test",
+    email: "test@gmail.com",
+    phone: "9999999999",
+    password: "test@123",
+    role: ROLES.SITE_ENGINEER,
+    companyId: "woodie-1",
+  },
 
   // Tier 2: Woodie 2 (6 Roles)
   {
@@ -191,7 +200,7 @@ async function seedMultiCompanyUsers() {
   // eslint-disable-next-line no-console
   console.log("Seeding multi-company users and validating tenant isolation...");
 
-  // 1. Remove old woodie-1 staff including test and all demo staff accounts
+  // 1. Remove old woodie-1 demo staff accounts
   const allowedWoodie1Emails = [
     "rizwan.ali@woodie-1.ae",
     "abid.kareem@woodie-1.ae",
@@ -199,6 +208,7 @@ async function seedMultiCompanyUsers() {
     "dadnah.team@woodie-1.ae",
     "abudhabi.team@woodie-1.ae",
     "dubai.team@woodie-1.ae",
+    "test@gmail.com",
   ];
   await TeamMember.deleteMany({
     $or: [
@@ -206,7 +216,6 @@ async function seedMultiCompanyUsers() {
       {
         email: {
           $in: [
-            "test@gmail.com",
             "admin@woodie-1.com",
             "manager@woodie-1.com",
             "opmanager@woodie-1.com",
