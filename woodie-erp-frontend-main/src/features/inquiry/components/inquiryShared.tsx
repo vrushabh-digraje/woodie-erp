@@ -13,38 +13,36 @@ export function displayOrEmpty(value: string | undefined | null): string {
 }
 
 const statusShort: Record<InquiryStatus, string> = {
-  "Visit Pending Approval": "Site visit acceptance pending",
+  "Visit Pending Approval": "Acceptance Pending",
   "Visit Approved": "Accepted",
   "Visit Rejected": "Rejected",
-  "Site Report Attached": "Done",
-  Won: "Done",
-  Lost: "Lost",
+  "Site Report Attached": "Accepted",
+  Won: "Accepted",
+  Lost: "Rejected",
 };
 
 export function inquiryStatusShortLabel(status: InquiryStatus | string): string {
   if (status in statusShort) return statusShort[status as InquiryStatus];
-  if (status === "Visit Pending Approval") return "Site visit acceptance pending";
-  if (status === "Visit Approved") return "Accepted";
-  if (status === "Visit Rejected") return "Rejected";
-  if (status === "Site Report Attached" || status === "Won") return "Done";
+  if (status === "Visit Pending Approval" || status === "Site visit acceptance pending" || status === "Acceptance Pending") {
+    return "Acceptance Pending";
+  }
+  if (status === "Visit Approved" || status === "Site Report Attached" || status === "Won" || status === "Accepted") {
+    return "Accepted";
+  }
+  if (status === "Visit Rejected" || status === "Lost" || status === "Rejected") {
+    return "Rejected";
+  }
   return String(status || "Unknown");
 }
 
 export function inquiryStatusPillClass(status: InquiryStatus | string): string {
+  const label = inquiryStatusShortLabel(status);
   const base = "inline-flex shrink-0 max-w-full rounded-full px-2.5 py-0.5 text-xs font-semibold border";
-  switch (status) {
-    case "Visit Pending Approval":
-    case "Site visit acceptance pending":
+  switch (label) {
+    case "Acceptance Pending":
       return `${base} bg-amber-50 text-amber-700 border-amber-200`;
-    case "Visit Approved":
     case "Accepted":
       return `${base} bg-emerald-50 text-emerald-700 border-emerald-200`;
-    case "Site Report Attached":
-    case "Done":
-    case "Won":
-      return `${base} bg-emerald-50 text-emerald-700 border-emerald-200`;
-    case "Lost":
-    case "Visit Rejected":
     case "Rejected":
       return `${base} bg-rose-50 text-rose-700 border-rose-200`;
     default:

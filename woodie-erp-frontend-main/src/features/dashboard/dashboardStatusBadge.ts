@@ -2,14 +2,10 @@ import { COLORS } from "../../constants/colors";
 import type { InquiryStatus } from "../inquiry/services/inquiryTypes";
 
 export function inquiryStatusBadgeColors(status: InquiryStatus | string) {
-  if (status === "Won") return COLORS.badge.won;
-  if (status === "Visit Approved" || status === "Accepted") {
+  if (status === "Visit Approved" || status === "Site Report Attached" || status === "Won" || status === "Accepted") {
     return { bg: "#ecfdf5", color: "#047857" };
   }
-  if (status === "Site Report Attached" || status === "Done") {
-    return { bg: "#eff6ff", color: "#1d4ed8" };
-  }
-  if (status === "Visit Pending Approval" || status === "Site visit acceptance pending") {
+  if (status === "Visit Pending Approval" || status === "Site visit acceptance pending" || status === "Acceptance Pending") {
     return { bg: "#fffbeb", color: "#b45309" };
   }
   if (status === "Visit Rejected" || status === "Rejected" || status === "Lost") {

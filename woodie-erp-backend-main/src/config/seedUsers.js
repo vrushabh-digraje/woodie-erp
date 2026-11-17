@@ -15,6 +15,10 @@ async function generateEmployeeId() {
 }
 
 async function seedUsers() {
+  // If multi-company is active, do not seed legacy single-tenant admin
+  const master = await TeamMember.findOne({ role: ROLES.MASTER_ADMIN });
+  if (master) return;
+
   const exists = await TeamMember.findOne({ email: DEFAULT_ADMIN.email });
   if (exists) return;
 

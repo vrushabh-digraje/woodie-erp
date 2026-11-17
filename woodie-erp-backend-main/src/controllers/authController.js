@@ -21,7 +21,17 @@ async function login(req, res) {
     return res.status(400).json({ message: "Email and password are required" });
   }
 
-  const member = await TeamMember.findOne({ email: String(email).trim().toLowerCase() }).select("+passwordHash");
+  const cleanEmail = String(email).trim().toLowerCase();
+  let member = await TeamMember.findOne({ email: cleanEmail }).select("+passwordHash");
+  if (!member) {
+    if (cleanEmail.includes("@woodie.ae")) {
+      member = await TeamMember.findOne({ email: cleanEmail.replace("@woodie.ae", "@woodie-1.ae") }).select("+passwordHash");
+    } else if (cleanEmail.includes("@woodie-1.ae")) {
+      member = await TeamMember.findOne({ email: cleanEmail.replace("@woodie-1.ae", "@woodie.ae") }).select("+passwordHash");
+    } else if (cleanEmail.includes("@woodie-1.com")) {
+      member = await TeamMember.findOne({ email: cleanEmail.replace("@woodie-1.com", "@woodie-1.ae") }).select("+passwordHash");
+    }
+  }
   if (!member || !isActiveMember(member)) {
     return res.status(401).json({ message: "Invalid email or password" });
   }

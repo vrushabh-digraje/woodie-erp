@@ -18,7 +18,7 @@ const ROLES = {
 };
 
 const COMPANIES = [
-  { id: "woodie-1", name: "Woodie 1", legalName: "Woodie Technical Services & Contracting LLC", domain: "woodie-1.com" },
+  { id: "woodie-1", name: "Woodie 1", legalName: "Woodie Technical Services & Contracting LLC", domain: "woodie-1.ae" },
   { id: "woodie-2", name: "Woodie 2", legalName: "Woodie 2 Contracting LLC", domain: "woodie-2.com" },
   { id: "woodie-3", name: "Woodie 3", legalName: "Woodie 3 Contracting LLC", domain: "woodie-3.com" },
 ];

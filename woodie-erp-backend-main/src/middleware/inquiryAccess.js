@@ -113,7 +113,15 @@ function buildInquiryListFilter(req) {
   let filter = {};
 
   if (status !== "All") {
-    filter.status = status;
+    if (status === "Accepted") {
+      filter.status = { $in: ["Visit Approved", "Site Report Attached", "Won"] };
+    } else if (status === "Acceptance Pending" || status === "Visit Pending Approval") {
+      filter.status = "Visit Pending Approval";
+    } else if (status === "Rejected" || status === "Visit Rejected") {
+      filter.status = { $in: ["Visit Rejected", "Lost"] };
+    } else {
+      filter.status = status;
+    }
   }
 
   if (isFieldRole(req.user?.role) && !isAdmin(req.user?.role) && !isManager(req.user?.role)) {

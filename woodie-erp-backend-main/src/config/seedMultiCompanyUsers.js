@@ -18,58 +18,58 @@ const SEEDED_ACCOUNTS = [
     companyId: "global",
   },
 
-  // Tier 2: Woodie 1 (6 Roles)
+  // Tier 2: Woodie 1 (Staff & Positions)
   {
     employeeId: "W1-0001",
-    name: "Woodie 1 Admin",
-    email: "admin@woodie-1.com",
-    phone: "+971501000001",
-    password: "admin@woodie-1",
-    role: ROLES.ADMIN,
-    companyId: "woodie-1",
-  },
-  {
-    employeeId: "W1-0002",
-    name: "Woodie 1 Manager",
-    email: "manager@woodie-1.com",
-    phone: "+971501000002",
-    password: "manager@woodie-1",
+    name: "Rizwan Ali",
+    email: "rizwan.ali@woodie-1.ae",
+    phone: "0501000001",
+    password: "rizwan.ali@123",
     role: ROLES.MANAGER,
     companyId: "woodie-1",
   },
   {
-    employeeId: "W1-0003",
-    name: "Woodie 1 Operation Manager",
-    email: "opmanager@woodie-1.com",
-    phone: "+971501000003",
-    password: "opmanager@woodie-1",
+    employeeId: "W1-0002",
+    name: "Abid Kareem",
+    email: "abid.kareem@woodie-1.ae",
+    phone: "0501000002",
+    password: "abid.kareem@123",
     role: ROLES.OPERATION_MANAGER,
     companyId: "woodie-1",
   },
   {
+    employeeId: "W1-0003",
+    name: "Admin Office",
+    email: "admin.office@woodie-1.ae",
+    phone: "0501000003",
+    password: "admin.office@123",
+    role: ROLES.ADMIN,
+    companyId: "woodie-1",
+  },
+  {
     employeeId: "W1-0004",
-    name: "Woodie 1 Engineer",
-    email: "engineer@woodie-1.com",
-    phone: "+971501000004",
-    password: "engineer@woodie-1",
-    role: ROLES.ENGINEER,
+    name: "Site Team Dadnah",
+    email: "dadnah.team@woodie-1.ae",
+    phone: "0501000004",
+    password: "dadnah.team@123",
+    role: ROLES.SITE_ENGINEER,
     companyId: "woodie-1",
   },
   {
     employeeId: "W1-0005",
-    name: "Woodie 1 Supervisor",
-    email: "supervisor@woodie-1.com",
-    phone: "+971501000005",
-    password: "supervisor@woodie-1",
-    role: ROLES.SUPERVISOR,
+    name: "Site Team Abu Dhabi",
+    email: "abudhabi.team@woodie-1.ae",
+    phone: "0501000005",
+    password: "abudhabi.team@123",
+    role: ROLES.SITE_ENGINEER,
     companyId: "woodie-1",
   },
   {
     employeeId: "W1-0006",
-    name: "Woodie 1 Site Engineer",
-    email: "siteengineer@woodie-1.com",
-    phone: "+971501000006",
-    password: "siteengineer@woodie-1",
+    name: "Site Team Dubai",
+    email: "dubai.team@woodie-1.ae",
+    phone: "0501000006",
+    password: "dubai.team@123",
     role: ROLES.SITE_ENGINEER,
     companyId: "woodie-1",
   },
@@ -191,7 +191,39 @@ async function seedMultiCompanyUsers() {
   // eslint-disable-next-line no-console
   console.log("Seeding multi-company users and validating tenant isolation...");
 
-  // 1. Seed or update all 19 accounts
+  // 1. Remove old woodie-1 staff including test and all demo staff accounts
+  const allowedWoodie1Emails = [
+    "rizwan.ali@woodie-1.ae",
+    "abid.kareem@woodie-1.ae",
+    "admin.office@woodie-1.ae",
+    "dadnah.team@woodie-1.ae",
+    "abudhabi.team@woodie-1.ae",
+    "dubai.team@woodie-1.ae",
+  ];
+  await TeamMember.deleteMany({
+    $or: [
+      { companyId: "woodie-1", email: { $nin: allowedWoodie1Emails } },
+      {
+        email: {
+          $in: [
+            "test@gmail.com",
+            "admin@woodie-1.com",
+            "manager@woodie-1.com",
+            "opmanager@woodie-1.com",
+            "engineer@woodie-1.com",
+            "supervisor@woodie-1.com",
+            "siteengineer@woodie-1.com",
+            "ramesh.site@woodie.com",
+            "vikram.sup@woodie.com",
+            "anil.tech@woodie.com",
+            "admin@woodie.com",
+          ],
+        },
+      },
+    ],
+  });
+
+  // 2. Seed or update all 19 accounts
   for (const acc of SEEDED_ACCOUNTS) {
     const existing = await TeamMember.findOne({ email: acc.email });
     const passwordHash = await TeamMember.hashPassword(acc.password);
@@ -215,6 +247,15 @@ async function seedMultiCompanyUsers() {
         passwordHash,
       });
     }
+  }
+
+  // Reassign any inquiries previously assigned to test
+  const defaultSiteTeam = await TeamMember.findOne({ email: "dubai.team@woodie-1.ae" });
+  if (defaultSiteTeam) {
+    await Inquiry.updateMany(
+      { companyId: "woodie-1", assignedPersonName: "test" },
+      { $set: { assignedPersonId: defaultSiteTeam._id, assignedPersonName: defaultSiteTeam.name } }
+    );
   }
 
   // eslint-disable-next-line no-console

@@ -23,14 +23,11 @@ import { useAuth } from "../../auth/AuthContext";
 import { BoqStatusBadge, EmptyState, InquiryStatCard, SiteVisitBadge, StatusBadge } from "../components/inquiryShared";
 import { visitDateToInputValue } from "../mapUtils";
 
-const STATUS_OPTIONS: (InquiryStatus | "All")[] = [
-  "All",
-  "Visit Pending Approval",
-  "Visit Approved",
-  "Visit Rejected",
-  "Site Report Attached",
-  "Won",
-  "Lost",
+const STATUS_OPTIONS: { value: InquiryStatus | "All"; label: string }[] = [
+  { value: "All", label: "All statuses" },
+  { value: "Visit Pending Approval", label: "Acceptance Pending" },
+  { value: "Visit Approved", label: "Accepted" },
+  { value: "Visit Rejected", label: "Rejected" },
 ];
 
 function InquiryListingPage() {
@@ -150,19 +147,9 @@ function InquiryListingPage() {
                 }}
                 className={`${themeClasses.select} w-full sm:w-auto`}
               >
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s === "Visit Approved"
-                      ? "Accepted"
-                      : s === "Visit Rejected"
-                        ? "Rejected"
-                        : s === "Visit Pending Approval"
-                          ? "Site visit acceptance pending"
-                          : s === "Site Report Attached"
-                            ? "Done"
-                            : s === "All"
-                              ? "All statuses"
-                              : s}
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
                   </option>
                 ))}
               </select>
